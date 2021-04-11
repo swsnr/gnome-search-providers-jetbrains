@@ -1,5 +1,34 @@
 # Gnome search provider for Jetbrains projects
 
+Add recent projects of various Jetbrains IDEs to Gnome search.
+
+**Note:** This extension is not affiliated with or endorsed by JetBrains.
+
+![Screenshot](./screenshot.png)
+
+Supports
+
+- IDEA Community (Jetbrains toolbox)
+- Webstorm (Jetbrains toolbox)
+
+Under the hood this is a small systemd user service which implements the [search provider][1] DBus API and exposes recent projects from Jetbrains IDEs.
+
+[1]: https://developer.gnome.org/SearchProvider/
+
+## Installation
+
+Install all requirements (see below), then run `sudo make install`.
+
+The DBus service is activatable; hence you don't need to `systemd enable` any service.
+
+To uninstall use `sudo make uninstall`
+
+## Requirements
+
+- [pygobject](https://pygobject.readthedocs.io/en/latest/getting_started.html)
+- [python-systemd](https://github.com/systemd/python-systemd)
+- [fuzzywuzzy](https://github.com/seatgeek/fuzzywuzzy)
+
 ## License
 
 Copyright Sebastian Wiesner <sebastian@swsnr.de>
