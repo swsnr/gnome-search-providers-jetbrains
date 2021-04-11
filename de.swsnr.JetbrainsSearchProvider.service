@@ -1,7 +1,0 @@
-[Unit]
-Description=Jetbrains projects search provider for Gnome shell
-
-[Service]
-Type=dbus
-BusName=de.swsnr.JetbrainsSearchProvider
-ExecStart=/usr/lib/jetbrains-search-provider/jetbrains-search-provider.py
