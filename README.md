@@ -2,7 +2,7 @@
 
 Add recent projects of various Jetbrains IDEs to Gnome search.
 
-**Note:** This extension is not affiliated with or endorsed by JetBrains.
+**Note:** This project is not affiliated with or endorsed by JetBrains.
 
 ![Screenshot](./screenshot.png)
 
