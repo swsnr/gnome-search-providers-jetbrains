@@ -17,11 +17,15 @@ Under the hood this is a small systemd user service which implements the [search
 
 ## Installation
 
+For Arch Linux there's an [AUR package][2].
+
 Install all requirements (see below), then run `sudo make install`.
 
 The DBus service is activatable; hence you don't need to `systemd enable` any service.
 
-To uninstall use `sudo make uninstall`
+To uninstall use `sudo make uninstall`.
+
+[2]: https://aur.archlinux.org/packages/gnome-search-providers-jetbrains/
 
 ## Requirements
 
