@@ -16,7 +16,7 @@ install:
 
 .PHONY: uninstall
 uninstall:
-	rm -f $(addprefix $(SEARCH_PROVIDERS_DIR),$(basename $(SEARCH_PROVIDERS)))
+	rm -f $(addprefix $(SEARCH_PROVIDERS_DIR),$(notdir $(SEARCH_PROVIDERS)))
 	rm -rf $(LIBDIR)/gnome-search-providers-jetbrains/
 	rm -f $(LIBDIR)/systemd/user/de.swsnr.searchprovider.Jetbrains.service
 	rm -f $(DATADIR)/dbus-1/services/de.swsnr.searchprovider.Jetbrains.service
