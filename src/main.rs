@@ -8,6 +8,7 @@
 
 //! Gnome search provider for Jetbrains products
 
+mod gnome;
 mod jetbrains;
 mod providers;
 
