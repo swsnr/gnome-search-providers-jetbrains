@@ -292,9 +292,49 @@ class ProviderDefinition:
 PROVIDERS = [
     # Toolbox products
     ProviderDefinition(
+        desktop_id="jetbrains-android-studio.desktop",
+        relative_obj_path="toolbox/android-studio",
+        config=ConfigLocation(vendor_dir="JetBrains", config_glob="AndroidStudio*"),
+    ),
+    ProviderDefinition(
+        desktop_id="jetbrains-clion.desktop",
+        relative_obj_path="toolbox/clion",
+        config=ConfigLocation(vendor_dir="JetBrains", config_glob="CLion*"),
+    ),
+    ProviderDefinition(
+        desktop_id="jetbrains-goland.desktop",
+        relative_obj_path="toolbox/goland",
+        config=ConfigLocation(vendor_dir="JetBrains", config_glob="GoLand*"),
+    ),
+    ProviderDefinition(
+        desktop_id="jetbrains-idea.desktop",
+        relative_obj_path="toolbox/idea",
+        config=ConfigLocation(vendor_dir="JetBrains", config_glob="IntelliJIdea*"),
+    ),
+    ProviderDefinition(
         desktop_id="jetbrains-idea-ce.desktop",
         relative_obj_path="toolbox/ideace",
         config=ConfigLocation(vendor_dir="JetBrains", config_glob="IdeaIC*"),
+    ),
+    ProviderDefinition(
+        desktop_id="jetbrains-phpstorm.desktop",
+        relative_obj_path="toolbox/phpstorm",
+        config=ConfigLocation(vendor_dir="JetBrains", config_glob="PhpStorm*"),
+    ),
+    ProviderDefinition(
+        desktop_id="jetbrains-pycharm.desktop",
+        relative_obj_path="toolbox/pycharm",
+        config=ConfigLocation(vendor_dir="JetBrains", config_glob="PyCharm*"),
+    ),
+    ProviderDefinition(
+        desktop_id="jetbrains-rider.desktop",
+        relative_obj_path="toolbox/rider",
+        config=ConfigLocation(vendor_dir="JetBrains", config_glob="Rider*"),
+    ),
+    ProviderDefinition(
+        desktop_id="jetbrains-rubymine.desktop",
+        relative_obj_path="toolbox/rubymine",
+        config=ConfigLocation(vendor_dir="JetBrains", config_glob="RubyMine*"),
     ),
     ProviderDefinition(
         desktop_id="jetbrains-webstorm.desktop",
