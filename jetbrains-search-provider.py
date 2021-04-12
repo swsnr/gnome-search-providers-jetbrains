@@ -293,11 +293,6 @@ class ProviderDefinition:
 PROVIDERS = [
     # Toolbox products
     ProviderDefinition(
-        desktop_id="jetbrains-android-studio.desktop",
-        relative_obj_path="toolbox/android-studio",
-        config=ConfigLocation(vendor_dir="Google", config_glob="AndroidStudio*"),
-    ),
-    ProviderDefinition(
         desktop_id="jetbrains-clion.desktop",
         relative_obj_path="toolbox/clion",
         config=ConfigLocation(vendor_dir="JetBrains", config_glob="CLion*"),
@@ -336,6 +331,11 @@ PROVIDERS = [
         desktop_id="jetbrains-rubymine.desktop",
         relative_obj_path="toolbox/rubymine",
         config=ConfigLocation(vendor_dir="JetBrains", config_glob="RubyMine*"),
+    ),
+    ProviderDefinition(
+        desktop_id="jetbrains-studio.desktop",
+        relative_obj_path="toolbox/studio",
+        config=ConfigLocation(vendor_dir="Google", config_glob="AndroidStudio*"),
     ),
     ProviderDefinition(
         desktop_id="jetbrains-webstorm.desktop",
@@ -390,7 +390,6 @@ def main():
     except Exception as error:
         log.exception(f"Failed to start jetbrains search provider: {error}")
         raise
-
 
 if __name__ == "__main__":
     try:
