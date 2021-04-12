@@ -86,6 +86,7 @@ search_provider_method = partial(
 class ConfigLocation:
     vendor_dir: str
     config_glob: str
+    projects_filename: str = "recentProjects.xml"
 
     def recent_projects(self) -> Optional[Path]:
         config_home = xdg_config_home()
@@ -101,7 +102,7 @@ class ConfigLocation:
         )
         config_dir = max(versioned, key=lambda i: i[1], default=None)
         if config_dir:
-            return config_dir[0] / "options" / "recentProjects.xml"
+            return config_dir[0] / "options" / self.projects_filename
         else:
             return None
 
@@ -294,7 +295,7 @@ PROVIDERS = [
     ProviderDefinition(
         desktop_id="jetbrains-android-studio.desktop",
         relative_obj_path="toolbox/android-studio",
-        config=ConfigLocation(vendor_dir="JetBrains", config_glob="AndroidStudio*"),
+        config=ConfigLocation(vendor_dir="Google", config_glob="AndroidStudio*"),
     ),
     ProviderDefinition(
         desktop_id="jetbrains-clion.desktop",
@@ -329,7 +330,7 @@ PROVIDERS = [
     ProviderDefinition(
         desktop_id="jetbrains-rider.desktop",
         relative_obj_path="toolbox/rider",
-        config=ConfigLocation(vendor_dir="JetBrains", config_glob="Rider*"),
+        config=ConfigLocation(vendor_dir="JetBrains", config_glob="Rider*", projects_filename="recentSolutions.xml"),
     ),
     ProviderDefinition(
         desktop_id="jetbrains-rubymine.desktop",
