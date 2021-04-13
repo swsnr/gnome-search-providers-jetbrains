@@ -1,4 +1,4 @@
 [D-BUS Service]
 Name=de.swsnr.searchprovider.Jetbrains
-Exec=/usr/lib/gnome-search-providers-jetbrains/jetbrains-search-provider.py
+Exec=/usr/lib/gnome-search-providers-jetbrains/gnome-search-providers-jetbrains
 SystemdService=de.swsnr.searchprovider.Jetbrains.service

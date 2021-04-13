@@ -4,4 +4,5 @@ Description=Jetbrains projects search provider for Gnome shell
 [Service]
 Type=dbus
 BusName=de.swsnr.searchprovider.Jetbrains
-ExecStart=/usr/lib/gnome-search-providers-jetbrains/jetbrains-search-provider.py
+ExecStart=/usr/lib/gnome-search-providers-jetbrains/gnome-search-providers-jetbrains
+Environment="RUST_LOG=info"

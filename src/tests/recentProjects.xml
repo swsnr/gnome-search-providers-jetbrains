@@ -1,0 +1,32 @@
+<application>
+    <component name="RecentProjectsManager">
+        <option name="additionalInfo">
+            <map>
+                <entry key="$USER_HOME$/Code/gh/mdcat">
+                    <value>
+                        <RecentProjectMetaInfo frameTitle="mdcat – test.yml" projectWorkspaceId="1o9BiIBThbl4cIwmIQFHUftWoG7">
+                            <option name="binFolder" value="$APPLICATION_HOME_DIR$/bin" />
+                            <option name="build" value="IC-203.7148.57" />
+                            <option name="buildTimestamp" value="1611627898456" />
+                            <frame x="960" y="32" width="960" height="1048" extendedState="4" />
+                            <option name="productionCode" value="IC" />
+                            <option name="projectOpenTimestamp" value="1618242624090" />
+                        </RecentProjectMetaInfo>
+                    </value>
+                </entry>
+                <entry key="$USER_HOME$/Code/gh/gnome-search-providers-jetbrains">
+                    <value>
+                        <RecentProjectMetaInfo frameTitle="gnome-search-providers-jetbrains – searchprovider.rs" opened="true" projectWorkspaceId="1r4lKxfxxP9yp4XSx3u0YDPaGyl">
+                            <option name="binFolder" value="$APPLICATION_HOME_DIR$/bin" />
+                            <option name="build" value="IC-211.6693.111" />
+                            <option name="buildTimestamp" value="1617703863501" />
+                            <frame x="0" y="32" width="1920" height="1048" extendedState="6" />
+                            <option name="productionCode" value="IC" />
+                            <option name="projectOpenTimestamp" value="1618243465479" />
+                        </RecentProjectMetaInfo>
+                    </value>
+                </entry>
+            </map>
+        </option>
+    </component>
+</application>

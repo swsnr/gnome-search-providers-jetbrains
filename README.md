@@ -8,8 +8,16 @@ Add recent projects of various Jetbrains IDEs to Gnome search.
 
 Supports
 
-- IDEA Community (Jetbrains toolbox)
-- Webstorm (Jetbrains toolbox)
+- Android Studio (toolbox)
+- CLion (toolbox)
+- GoLand (toolbox)
+- IDEA (toolbox)
+- IDEA Community Edition (toolbox)
+- PHPStorm (toolbox)
+- PyCharm (toolbox)
+- Rider (toolbox)
+- RubyMine (toolbox)
+- WebStorm (toolbox)
 
 Under the hood this is a small systemd user service which implements the [search provider][1] DBus API and exposes recent projects from Jetbrains IDEs.
 
@@ -17,21 +25,25 @@ Under the hood this is a small systemd user service which implements the [search
 
 ## Installation
 
-For Arch Linux there's an [AUR package][2].
+### Packages & binaries
 
-Install all requirements (see below), then run `sudo make install`.
+- [AUR package](https://aur.archlinux.org/packages/gnome-search-providers-jetbrains/)
 
-The DBus service is activatable; hence you don't need to `systemd enable` any service.
+### From source
+
+Install [rust](https://www.rust-lang.org/tools/install) then run
+
+```console
+$ make build
+$ sudo make install
+```
+
+This install to `/usr/local/`.
+
+**Note:** You really do need to install as `root`, system-wide.
+A per-user installation to `$HOME` does not work as of Gnome 40, because Gnome shell doesn't load search providers from `$HOME` (see <https://gitlab.gnome.org/GNOME/gnome-shell/-/issues/3060>).
 
 To uninstall use `sudo make uninstall`.
-
-[2]: https://aur.archlinux.org/packages/gnome-search-providers-jetbrains/
-
-## Requirements
-
-- [pygobject](https://pygobject.readthedocs.io/en/latest/getting_started.html)
-- [python-systemd](https://github.com/systemd/python-systemd)
-- [fuzzywuzzy](https://github.com/seatgeek/fuzzywuzzy)
 
 ## License
 
