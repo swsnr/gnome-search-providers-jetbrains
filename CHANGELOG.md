@@ -9,7 +9,7 @@ and this project doesn't really care for versioning.
 ### Fixed
 
 - Add missing directory separate in `make uninstall` to remove search provider configurations properly.
-
+- Remove redundant `Environment` stanza from systemd unit.
 
 ## [1.1.0] – 2021-04-15
 
