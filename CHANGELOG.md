@@ -6,6 +6,8 @@ and this project doesn't really care for versioning.
 
 ## [Unreleased]
 
+## [1.2.0] — 2021-04-16
+
 ### Changed
 
 ### Fixed
@@ -36,6 +38,7 @@ and this project doesn't really care for versioning.
 
 Initial prototype in Python, with support for Toolbox IDEA CE and WebStorm.
 
-[Unreleased]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/olivierlacan/keep-a-changelog/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/olivierlacan/keep-a-changelog/compare/v1...v1.1.0
 [1]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/releases/tag/v1
