@@ -301,12 +301,17 @@ where
     projects.filter_map(move |(id, project)| {
         Some(id).filter(move |_| {
             let path = project.borrow().path.as_os_str().to_str();
-            terms
-                .iter()
-                .all(|term| project.borrow().name.contains(term.as_ref()))
-                || path.map_or(false, |p| {
-                    terms.iter().all(|term| p.contains(term.as_ref()))
-                })
+            terms.iter().all(|term| {
+                project
+                    .borrow()
+                    .name
+                    .to_lowercase()
+                    .contains(&term.as_ref().to_lowercase())
+            }) || path.map_or(false, |p| {
+                terms
+                    .iter()
+                    .all(|term| p.to_lowercase().contains(&term.as_ref().to_lowercase()))
+            })
         })
     })
 }
@@ -677,6 +682,30 @@ mod tests {
                 ),
             ];
             assert!(do_match(&projects, &["flutter_test_app"]).is_empty());
+        }
+
+        #[test]
+        fn ignore_case_of_name() {
+            let projects = vec![(
+                "foo",
+                RecentProject {
+                    name: "mdCat".to_string(),
+                    path: Path::new("/home/foo/dev/foo").to_path_buf(),
+                },
+            )];
+            assert_eq!(do_match(&projects, &["Mdcat"]), ["foo"]);
+        }
+
+        #[test]
+        fn ignore_case_of_path() {
+            let projects = vec![(
+                "foo",
+                RecentProject {
+                    name: "bar".to_string(),
+                    path: Path::new("/home/foo/dev/mdcaT").to_path_buf(),
+                },
+            )];
+            assert_eq!(do_match(&projects, &["Mdcat"]), ["foo"]);
         }
     }
 

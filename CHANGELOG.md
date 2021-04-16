@@ -6,6 +6,8 @@ and this project doesn't really care for versioning.
 
 ## [Unreleased]
 
+### Changed
+
 ### Fixed
 
 - Add missing directory separate in `make uninstall` to remove search provider configurations properly.
