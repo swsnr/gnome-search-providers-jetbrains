@@ -20,7 +20,7 @@ use anyhow::{Context, Result};
 use elementtree::Element;
 use gio::{AppInfoExt, IconExt};
 use lazy_static::lazy_static;
-use log::{debug, error, info};
+use log::{debug, error, info, warn};
 use regex::Regex;
 use std::borrow::Borrow;
 use zbus::export::zvariant;
@@ -557,8 +557,10 @@ fn start_dbus_service_loop() -> Result<()> {
     }
 
     loop {
-        if let Err(err) = object_server.try_handle_next() {
-            error!("{}", err);
+        match object_server.try_handle_next() {
+            Ok(None) => debug!("Interface message processed"),
+            Ok(Some(message)) => warn!("Message not handled by interfaces: {:?}", message),
+            Err(err) => error!("{}", err),
         }
     }
 }
