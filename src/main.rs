@@ -535,9 +535,6 @@ const BUSNAME: &str = "de.swsnr.searchprovider.Jetbrains";
 fn start_dbus_service_loop() -> Result<()> {
     let connection =
         zbus::Connection::new_session().with_context(|| "Failed to connect to session bus")?;
-    fdo::DBusProxy::new(&connection)?
-        .request_name(BUSNAME, fdo::RequestNameFlags::ReplaceExisting.into())
-        .with_context(|| "Failed to acquire bus name")?;
 
     let mut object_server = zbus::ObjectServer::new(&connection);
     for provider in PROVIDERS {
@@ -555,6 +552,10 @@ fn start_dbus_service_loop() -> Result<()> {
             object_server.at(&provider.objpath().try_into()?, dbus_provider)?;
         }
     }
+
+    fdo::DBusProxy::new(&connection)?
+        .request_name(BUSNAME, fdo::RequestNameFlags::ReplaceExisting.into())
+        .with_context(|| "Failed to acquire bus name")?;
 
     loop {
         match object_server.try_handle_next() {
