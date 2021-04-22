@@ -9,6 +9,7 @@ and this project doesn't really care for versioning.
 ### Fixed
 
 - Exit with failure if the desired bus name is already owned by another process.
+- Substitute prefix in service files during `make build` and `make install`.
 
 ## [1.2.1] — 2021-04-16
 
