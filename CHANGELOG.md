@@ -6,6 +6,7 @@ and this project doesn't really care for versioning.
 
 ## [Unreleased]
 
+## [1.2.2] – 2021-04-22
 ### Fixed
 
 - Exit with failure if the desired bus name is already owned by another process.
@@ -51,7 +52,8 @@ and this project doesn't really care for versioning.
 
 Initial prototype in Python, with support for Toolbox IDEA CE and WebStorm.
 
-[Unreleased]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/compare/v1.2.1...HEAD
+[Unreleased]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/compare/v1.2.2...HEAD
+[1.2.1]: https://github.com/olivierlacan/keep-a-changelog/compare/v1.2.1...v1.2.2
 [1.2.1]: https://github.com/olivierlacan/keep-a-changelog/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/olivierlacan/keep-a-changelog/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/olivierlacan/keep-a-changelog/compare/v1...v1.1.0
