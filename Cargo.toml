@@ -24,7 +24,7 @@ elementtree = "^0.5"
 anyhow = "^1.0"
 env_logger = "^0.8"
 log = "^0.4"
-clap = "^2.33"
+clap = { version = "^2.33", default-features = false }
 
 [dev-dependencies]
 pretty_assertions = "^0.7"
