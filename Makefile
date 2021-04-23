@@ -16,7 +16,7 @@ build:
 
 
 .PHONY: install
-install:
+install: build
 	install -Dm644 -t $(SEARCH_PROVIDERS_DIR) $(SEARCH_PROVIDERS)
 	install -Dm755 -t $(LIBDIR)/gnome-search-providers-jetbrains/ target/release/gnome-search-providers-jetbrains
 	install -Dm644 -t $(LIBDIR)/systemd/user/ target/systemd/de.swsnr.searchprovider.Jetbrains.service
