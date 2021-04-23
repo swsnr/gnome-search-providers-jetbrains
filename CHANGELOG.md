@@ -6,6 +6,8 @@ and this project doesn't really care for versioning.
 
 ## [Unreleased]
 
+[1.2.3] – 2021-04-23
+
 ### Fixed
 - Fix `make install` with parallel make, by setting a proper dependency on the `build` target.
 
