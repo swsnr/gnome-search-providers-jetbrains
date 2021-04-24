@@ -379,13 +379,13 @@ impl JetbrainsSearchProvider<'static> {
         );
         self.update_recent_projects().map_err(|error| {
             error!(
-                "Failed to update recent projects for {} at {:?}: {}",
+                "Failed to update recent projects for {} at {:?}: {:#}",
                 self.app.get_id().unwrap(),
                 self.config,
                 error
             );
             zbus::fdo::Error::Failed(format!(
-                "Failed to update recent projects for {}: {}",
+                "Failed to update recent projects for {}: {:#}",
                 self.app.get_id().unwrap(),
                 error
             ))
@@ -514,7 +514,7 @@ impl JetbrainsSearchProvider<'static> {
             .launch::<gio::AppLaunchContext>(&[], None)
             .map_err(|error| {
                 error!(
-                    "Failed to launch app {}: {}",
+                    "Failed to launch app {}: {:#}",
                     self.app.get_id().unwrap(),
                     error
                 );
@@ -564,7 +564,7 @@ fn start_dbus_service_loop() -> Result<()> {
             match object_server.try_handle_next() {
                 Ok(None) => debug!("Interface message processed"),
                 Ok(Some(message)) => warn!("Message not handled by interfaces: {:?}", message),
-                Err(err) => error!("{}", err),
+                Err(err) => error!("{:#}", err),
             }
         }
     } else {
@@ -609,7 +609,7 @@ Set $RUST_LOG to control the log level",
         );
 
         if let Err(err) = start_dbus_service_loop() {
-            error!("Failed to start DBus loop: {}", err);
+            error!("Failed to start DBus loop: {:#}", err);
             std::process::exit(1)
         }
     }
