@@ -280,6 +280,30 @@ struct RecentProject {
     path: PathBuf,
 }
 
+/// Compute the score of matching `project` against `terms`.
+///
+/// If all terms match the name each term contributes a score of 10; this makes sure
+/// that precise matches in the name boost the score somewhat to the top.
+///
+/// If all terms match the patch each term contributes 1 to score, scaled by the relative position
+/// of the right-most match, assuming that paths typically go from least to most specific segment,
+/// to the farther to the right a term matches the more specific it was.
+fn match_score<S: AsRef<str>>(project: &RecentProject, terms: &[S]) -> f64 {
+    let name = project.name.to_lowercase();
+    let path = project.path.to_string_lossy().to_lowercase();
+    let name_score = terms.iter().try_fold(0.0, |score, term| {
+        name.contains(&term.as_ref().to_lowercase())
+            .then(|| score + 10.0)
+            .ok_or(())
+    });
+    let path_score = terms.iter().try_fold(0.0, |score, term| {
+        path.rfind(&term.as_ref().to_lowercase())
+            .ok_or(())
+            .map(|index| score + 1.0 * (index as f64 / path.len() as f64))
+    });
+    name_score.unwrap_or_default() + path_score.unwrap_or_default()
+}
+
 /// Find all projects from `projects` which match the given `terms`.
 ///
 /// `projects` is an iterator over pairs of `(id, project)`.
@@ -289,32 +313,25 @@ struct RecentProject {
 ///
 /// Currently this simply checks whether all terms are container in `path` or `name`
 /// but this is subject to change.
-fn find_matching_projects<'a, I, S, T, P>(
-    projects: I,
-    terms: &'a [S],
-) -> impl Iterator<Item = T> + 'a
+fn find_matching_projects<'a, I, S, T, P>(projects: I, terms: &'a [S]) -> Vec<T>
 where
     I: Iterator<Item = (T, P)> + 'a,
     P: Borrow<RecentProject>,
-    T: AsRef<str>,
     S: AsRef<str>,
 {
-    projects.filter_map(move |(id, project)| {
-        Some(id).filter(move |_| {
-            let path = project.borrow().path.as_os_str().to_str();
-            terms.iter().all(|term| {
-                project
-                    .borrow()
-                    .name
-                    .to_lowercase()
-                    .contains(&term.as_ref().to_lowercase())
-            }) || path.map_or(false, |p| {
-                terms
-                    .iter()
-                    .all(|term| p.to_lowercase().contains(&term.as_ref().to_lowercase()))
-            })
+    let mut matches: Vec<(f64, T)> = projects
+        .filter_map(move |(id, project)| {
+            let score = match_score(project.borrow(), terms);
+            if 0.0 < score {
+                Some((score, id))
+            } else {
+                None
+            }
         })
-    })
+        .collect();
+    // Sort by score, descending
+    matches.sort_by(|(score_a, _), (score_b, _)| score_b.partial_cmp(score_a).unwrap());
+    matches.into_iter().map(move |(_, id)| id).collect()
 }
 
 /// A DBus search provider for a Jetbrains app.
@@ -392,6 +409,7 @@ impl JetbrainsSearchProvider<'static> {
         })?;
 
         let ids = find_matching_projects(self.projects.iter(), terms.as_slice())
+            .into_iter()
             .map(String::to_owned)
             .collect();
         debug!("Found ids {:?} for {}", ids, self.app.get_id().unwrap());
@@ -419,6 +437,7 @@ impl JetbrainsSearchProvider<'static> {
             .filter_map(|id| self.projects.get(id).map(|p| (id, p)));
 
         let ids = find_matching_projects(candidates, terms.as_slice())
+            .into_iter()
             .map(String::to_owned)
             .collect();
         debug!("Found ids {:?} for {}", ids, self.app.get_id().unwrap());
@@ -655,7 +674,7 @@ mod tests {
         use crate::{find_matching_projects, RecentProject};
 
         fn do_match<'a>(projects: &[(&'a str, RecentProject)], terms: &[&str]) -> Vec<&'a str> {
-            find_matching_projects(projects.iter().map(|(s, p)| (*s, p)), terms).collect()
+            find_matching_projects(projects.iter().map(|(s, p)| (*s, p)), terms)
         }
 
         #[test]
@@ -721,6 +740,50 @@ mod tests {
                 },
             )];
             assert_eq!(do_match(&projects, &["Mdcat"]), ["foo"]);
+        }
+
+        #[test]
+        fn matches_in_name_rank_higher() {
+            let projects = vec![
+                (
+                    "1",
+                    RecentProject {
+                        name: "bar".to_string(),
+                        // This matches foo as well because of /home/foo
+                        path: Path::new("/home/foo/dev/bar").to_path_buf(),
+                    },
+                ),
+                (
+                    "2",
+                    RecentProject {
+                        name: "foo".to_string(),
+                        path: Path::new("/home/foo/dev/foo").to_path_buf(),
+                    },
+                ),
+            ];
+            assert_eq!(do_match(&projects, &["foo"]), ["2", "1"]);
+        }
+
+        #[test]
+        fn matches_at_end_of_path_rank_higher() {
+            let projects = vec![
+                (
+                    "1",
+                    RecentProject {
+                        name: "p1".to_string(),
+                        // This matches foo as well because of /home/foo
+                        path: Path::new("/home/foo/dev/bar").to_path_buf(),
+                    },
+                ),
+                (
+                    "2",
+                    RecentProject {
+                        name: "p1".to_string(),
+                        path: Path::new("/home/foo/dev/foo").to_path_buf(),
+                    },
+                ),
+            ];
+            assert_eq!(do_match(&projects, &["foo"]), ["2", "1"]);
         }
     }
 

@@ -6,7 +6,11 @@ and this project doesn't really care for versioning.
 
 ## [Unreleased]
 
-[1.2.3] – 2021-04-23
+### Changed
+
+- Improve order of matches: Rank matches in the project name higher than matches in the path, and rank path matches by position of term in match (the more to the right the better the term matched the more specific segments of the path).
+
+## [1.2.3] – 2021-04-23
 
 ### Fixed
 - Fix `make install` with parallel make, by setting a proper dependency on the `build` target.
