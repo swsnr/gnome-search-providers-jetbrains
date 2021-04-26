@@ -308,11 +308,8 @@ fn match_score<S: AsRef<str>>(project: &RecentProject, terms: &[S]) -> f64 {
 ///
 /// `projects` is an iterator over pairs of `(id, project)`.
 ///
-/// For each `project` match `terms` against the name and the `path` and return
-/// a vector with all `id`s of projects which match.
-///
-/// Currently this simply checks whether all terms are container in `path` or `name`
-/// but this is subject to change.
+/// For each project compute the score with `match_score`; discard projects with zero score,
+/// and return a list of project IDs with non-zero score, ordered by score in descending order.
 fn find_matching_projects<'a, I, S, T, P>(projects: I, terms: &'a [S]) -> Vec<T>
 where
     I: Iterator<Item = (T, P)> + 'a,
