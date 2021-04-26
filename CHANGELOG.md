@@ -11,8 +11,8 @@ and this project doesn't really care for versioning.
 ### Changed
 
 - Improve order of matches: 
-  - Rank matches in the project name higher than matches in the path, and rank
-  - path matches by position of term in match (the more to the right the better the term matched the more specific segments of the path).
+  - Rank matches in the project name higher than matches in the path, and
+  - rank path matches by position of term in match (the more to the right the better the term matched the more specific segments of the path).
 
 ## [1.2.3] – 2021-04-23
 
@@ -69,7 +69,7 @@ Initial prototype in Python, with support for Toolbox IDEA CE and WebStorm.
 
 [Unreleased]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/compare/v1.3.0...HEAD
 [1.3.0]: https://github.com/olivierlacan/keep-a-changelog/compare/v1.2.3...v1.3.0
-[1.2.2]: https://github.com/olivierlacan/keep-a-changelog/compare/v1.2.2...v1.2.3
+[1.2.3]: https://github.com/olivierlacan/keep-a-changelog/compare/v1.2.2...v1.2.3
 [1.2.2]: https://github.com/olivierlacan/keep-a-changelog/compare/v1.2.1...v1.2.2
 [1.2.1]: https://github.com/olivierlacan/keep-a-changelog/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/olivierlacan/keep-a-changelog/compare/v1.1.0...v1.2.0
