@@ -285,7 +285,7 @@ struct RecentProject {
 /// If all terms match the name each term contributes a score of 10; this makes sure
 /// that precise matches in the name boost the score somewhat to the top.
 ///
-/// If all terms match the patch each term contributes 1 to score, scaled by the relative position
+/// If all terms match the path each term contributes 1 to score, scaled by the relative position
 /// of the right-most match, assuming that paths typically go from least to most specific segment,
 /// to the farther to the right a term matches the more specific it was.
 fn match_score<S: AsRef<str>>(project: &RecentProject, terms: &[S]) -> f64 {
