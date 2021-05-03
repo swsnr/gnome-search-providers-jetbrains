@@ -28,6 +28,7 @@ Under the hood this is a small systemd user service which implements the [search
 ### Packages & binaries
 
 - [AUR package](https://aur.archlinux.org/packages/gnome-search-providers-jetbrains/)
+- [Fedora RPM](https://copr.fedorainfracloud.org/coprs/dontfreakout/gnome-search-providers-jetbrains/)
 
 ### From source
 
