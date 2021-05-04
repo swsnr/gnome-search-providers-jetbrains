@@ -29,6 +29,12 @@ Under the hood this is a small systemd user service which implements the [search
 
 - [AUR package](https://aur.archlinux.org/packages/gnome-search-providers-jetbrains/)
 
+The following repositories are provided by 3rd parties, and listed only for informational purposes only.
+I do **not** support or endorse these repositories, **use at your own risk.**
+
+- [Fedora COPR](https://copr.fedorainfracloud.org/coprs/dontfreakout/gnome-search-providers-jetbrains/) by [dontfreakout](https://github.com/dontfreakout).
+
+
 ### From source
 
 Install [rust](https://www.rust-lang.org/tools/install) then run
