@@ -15,6 +15,7 @@ publish = false
 
 [dependencies]
 zbus = "^1.9"
+glib = "^0.10"
 gio = "^0.9"
 globwalk = "^0.8"
 regex = "^1.4"
@@ -24,6 +25,7 @@ elementtree = "^0.5"
 anyhow = "^1.0"
 env_logger = "^0.8"
 log = "^0.4"
+libc = "^0.2"
 clap = { version = "^2.33", default-features = false }
 
 [dev-dependencies]
