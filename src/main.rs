@@ -10,9 +10,11 @@
 
 use std::collections::HashMap;
 use std::convert::TryInto;
+use std::default::Default;
 use std::ffi::OsStr;
 use std::fs::File;
 use std::io::Read;
+use std::os::unix::io::AsRawFd;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
@@ -546,14 +548,16 @@ impl JetbrainsSearchProvider<'static> {
 /// The name to request on the bus.
 const BUSNAME: &str = "de.swsnr.searchprovider.Jetbrains";
 
-/// Starts the DBUS service loop.
+/// Starts the DBUS service.
 ///
-/// Register all providers whose underlying app is installed.
-fn start_dbus_service_loop() -> Result<()> {
-    let connection =
-        zbus::Connection::new_session().with_context(|| "Failed to connect to session bus")?;
-
-    let mut object_server = zbus::ObjectServer::new(&connection);
+/// Connect to the session bus and register a new DBus object for every provider
+/// whose underlying app is installed.
+///
+/// Then register the connection on the Glib main loop and install a callback to
+/// handle incoming messages.
+///
+/// Return the connection and the source ID for the mainloop callback.
+fn register_search_providers(object_server: &mut zbus::ObjectServer) -> Result<()> {
     for provider in PROVIDERS {
         if let Some(app) = gio::DesktopAppInfo::new(provider.desktop_id) {
             info!(
@@ -569,26 +573,74 @@ fn start_dbus_service_loop() -> Result<()> {
             object_server.at(&provider.objpath().try_into()?, dbus_provider)?;
         }
     }
+    Ok(())
+}
 
-    info!("All providers registered, acquiring {}", BUSNAME);
+fn acquire_bus_name(connection: &zbus::Connection) -> Result<()> {
     let reply = fdo::DBusProxy::new(&connection)?
         .request_name(BUSNAME, fdo::RequestNameFlags::DoNotQueue.into())
         .with_context(|| format!("Request to acquire name {} failed", BUSNAME))?;
     if reply == RequestNameReply::PrimaryOwner {
-        info!("Acquired name {}, handling DBus events", BUSNAME);
-        loop {
-            match object_server.try_handle_next() {
-                Ok(None) => debug!("Interface message processed"),
-                Ok(Some(message)) => warn!("Message not handled by interfaces: {:?}", message),
-                Err(err) => error!("{:#}", err),
-            }
-        }
+        Ok(())
     } else {
         Err(anyhow!(
             "Failed to acquire bus name {} (reply from server: {:?})",
             BUSNAME,
             reply
         ))
+    }
+}
+
+fn start_dbus_service() -> Result<()> {
+    let context = glib::MainContext::default();
+    if !context.acquire() {
+        Err(anyhow!("Failed to acquire main context!"))
+    } else {
+        let mainloop = glib::MainLoop::new(Some(&context), false);
+
+        let connection =
+            zbus::Connection::new_session().with_context(|| "Failed to connect to session bus")?;
+        let mut object_server = zbus::ObjectServer::new(&connection);
+
+        register_search_providers(&mut object_server)?;
+        info!("All providers registered, acquiring {}", BUSNAME);
+        acquire_bus_name(&connection)?;
+        info!("Acquired name {}, handling DBus events", BUSNAME);
+
+        glib::source::unix_fd_add_local(
+            connection.as_raw_fd(),
+            glib::IOCondition::IN | glib::IOCondition::PRI,
+            move |_, condition| {
+                debug!("Connection entered IO condition {:?}", condition);
+                match object_server.try_handle_next() {
+                    Ok(None) => debug!("Interface message processed"),
+                    Ok(Some(message)) => warn!("Message not handled by interfaces: {:?}", message),
+                    Err(err) => error!("Failed to process message: {:#}", err),
+                };
+                glib::Continue(true)
+            },
+        );
+
+        glib::source::unix_signal_add(libc::SIGTERM, {
+            let l = mainloop.clone();
+            move || {
+                debug!("Terminated, quitting mainloop");
+                l.quit();
+                glib::Continue(false)
+            }
+        });
+
+        glib::source::unix_signal_add(libc::SIGINT, {
+            let l = mainloop.clone();
+            move || {
+                debug!("Interrupted, quitting mainloop");
+                l.quit();
+                glib::Continue(false)
+            }
+        });
+
+        mainloop.run();
+        Ok(())
     }
 }
 
@@ -624,8 +676,8 @@ Set $RUST_LOG to control the log level",
             env!("CARGO_PKG_VERSION")
         );
 
-        if let Err(err) = start_dbus_service_loop() {
-            error!("Failed to start DBus loop: {:#}", err);
+        if let Err(err) = start_dbus_service() {
+            error!("Main loop error: {:#}", err);
             std::process::exit(1)
         }
     }
