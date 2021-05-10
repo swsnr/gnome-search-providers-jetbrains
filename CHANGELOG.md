@@ -7,7 +7,7 @@ and this project doesn't really care for versioning.
 ## [Unreleased]
 
 ### Fixed
-- Correctly detect overriden names of projects.
+- Correctly detect overridden names of projects.
 
 ## [1.3.0] – 2021-04-25
 
