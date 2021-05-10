@@ -127,7 +127,7 @@ impl ConfigLocation<'_> {
 /// or cannot be read take the file name of `path`, and ultimately return `None` if
 /// the name cannot be determined.
 fn get_project_name(path: &Path) -> Option<String> {
-    File::open(path.join(".idea").join("name"))
+    File::open(path.join(".idea").join(".name"))
         .and_then(|mut source| {
             let mut buffer = String::new();
             source.read_to_string(&mut buffer)?;
