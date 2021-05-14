@@ -39,7 +39,7 @@ struct VersionedPath {
 }
 
 /// Read paths of all recent projects from the given `reader`.
-fn read_recent_jetbrains_projects<R: Read>(reader: R) -> Result<Vec<PathBuf>> {
+fn read_recent_jetbrains_projects<R: Read>(reader: R) -> Result<Vec<String>> {
     let element = Element::from_reader(reader)?;
     let home = dirs::home_dir()
         .with_context(|| "$HOME directory required")?
@@ -59,7 +59,7 @@ fn read_recent_jetbrains_projects<R: Read>(reader: R) -> Result<Vec<PathBuf>> {
         .map(|map| {
             map.find_all("entry")
                 .filter_map(|entry| entry.get_attr("key"))
-                .map(|key| Path::new(&key.replace("$USER_HOME$", &home)).to_path_buf())
+                .map(|key| key.replace("$USER_HOME$", &home))
                 .collect()
         })
         .unwrap_or_default();
@@ -129,8 +129,8 @@ impl ConfigLocation<'_> {
 /// Look for a `name` file in the `.idea` sub-directory; if that file does not exist
 /// or cannot be read take the file name of `path`, and ultimately return `None` if
 /// the name cannot be determined.
-fn get_project_name(path: &Path) -> Option<String> {
-    File::open(path.join(".idea").join(".name"))
+fn get_project_name<P: AsRef<Path>>(path: P) -> Option<String> {
+    File::open(path.as_ref().join(".idea").join(".name"))
         .and_then(|mut source| {
             let mut buffer = String::new();
             source.read_to_string(&mut buffer)?;
@@ -138,7 +138,8 @@ fn get_project_name(path: &Path) -> Option<String> {
         })
         .ok()
         .or_else(|| {
-            path.file_name()
+            path.as_ref()
+                .file_name()
                 .map(|name| name.to_string_lossy().to_string())
         })
 }
@@ -290,12 +291,8 @@ impl<'a> ItemsSource<RecentFileSystemItem> for JetbrainsProjectsSource<'a> {
         if let Some(projects_file) = self.config.find_latest_recent_projects_file(&config_home) {
             for path in read_recent_jetbrains_projects(File::open(projects_file)?)? {
                 if let Some(name) = get_project_name(&path) {
-                    let id = format!(
-                        "jetbrains-recent-project-{}-{}",
-                        self.app_id,
-                        path.display()
-                    );
-                    items.insert(id, RecentFileSystemItem { name, path });
+                    let id = format!("jetbrains-recent-project-{}-{}", self.app_id, path);
+                    items.insert(id, RecentFileSystemItem { name, path: path });
                 }
             }
         };
@@ -404,13 +401,10 @@ impl JetbrainsSearchProvider<'static> {
                     debug!("Using icon {} for id {}", icon, id);
 
                     let mut meta: HashMap<String, zvariant::Value> = HashMap::new();
-                    meta.insert("id".to_owned(), id.into());
-                    meta.insert("name".to_owned(), (&project.name).into());
-                    meta.insert("gicon".to_owned(), icon.to_string().into());
-                    meta.insert(
-                        "description".to_owned(),
-                        project.path.to_string_lossy().into_owned().into(),
-                    );
+                    meta.insert("id".to_string(), id.into());
+                    meta.insert("name".to_string(), (&project.name).into());
+                    meta.insert("gicon".to_string(), icon.to_string().into());
+                    meta.insert("description".to_string(), project.path.to_string().into());
                     meta
                 })
             })
@@ -438,13 +432,13 @@ impl JetbrainsSearchProvider<'static> {
                     error!(
                         "Failed to launch app {} for path {}: {}",
                         self.app.get_id().unwrap(),
-                        project.path.display(),
+                        project.path,
                         error
                     );
                     zbus::fdo::Error::SpawnFailed(format!(
                         "Failed to launch app {} for path {}: {}",
                         self.app.get_id().unwrap(),
-                        project.path.display(),
+                        project.path,
                         error
                     ))
                 })

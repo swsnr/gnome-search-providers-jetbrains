@@ -6,8 +6,6 @@
 
 //! Matching things from filesystems.
 
-use std::path::PathBuf;
-
 use super::ScoreMatchable;
 
 /// A recent item from the file system.
@@ -16,7 +14,10 @@ pub struct RecentFileSystemItem {
     /// The human readable name
     pub name: String,
     /// The path on the file system.
-    pub path: PathBuf,
+    ///
+    /// The path doesn't need to be a filesystem path, strictly, as long as it's something
+    /// that resembles a path, e.g. a URL.
+    pub path: String,
 }
 
 impl ScoreMatchable for RecentFileSystemItem {
@@ -30,7 +31,7 @@ impl ScoreMatchable for RecentFileSystemItem {
     /// to the farther to the right a term matches the more specific it was.
     fn match_score<S: AsRef<str>>(&self, terms: &[S]) -> f64 {
         let name = self.name.to_lowercase();
-        let path = self.path.to_string_lossy().to_lowercase();
+        let path = self.path.to_lowercase();
         let name_score = terms.iter().try_fold(0.0, |score, term| {
             name.contains(&term.as_ref().to_lowercase())
                 .then(|| score + 10.0)
@@ -49,7 +50,6 @@ impl ScoreMatchable for RecentFileSystemItem {
 mod tests {
     mod search {
         use crate::{find_matching_items, RecentFileSystemItem};
-        use std::path::Path;
 
         fn do_match<'a>(items: &[(&'a str, RecentFileSystemItem)], terms: &[&str]) -> Vec<&'a str> {
             find_matching_items(items.iter().map(|(s, p)| (*s, p)), terms)
@@ -61,7 +61,7 @@ mod tests {
                 "foo",
                 RecentFileSystemItem {
                     name: "mdcat".to_string(),
-                    path: Path::new("/home/foo/dev/mdcat").to_path_buf(),
+                    path: "/home/foo/dev/mdcat".to_string(),
                 },
             )];
             assert_eq!(do_match(&projects, &["mdcat"]), ["foo"]);
@@ -75,21 +75,21 @@ mod tests {
                     "foo-1",
                     RecentFileSystemItem {
                         name: "ui-pattern-library".to_string(),
-                        path: Path::new("/home/foo/dev/something/ui-pattern-library").to_path_buf(),
+                        path: "/home/foo/dev/something/ui-pattern-library".to_string(),
                     },
                 ),
                 (
                     "foo-2",
                     RecentFileSystemItem {
                         name: "dauntless-builder".to_string(),
-                        path: Path::new("/home/foo/dev/dauntless-builder").to_path_buf(),
+                        path: "/home/foo/dev/dauntless-builder".to_string(),
                     },
                 ),
                 (
                     "foo-3",
                     RecentFileSystemItem {
                         name: "typo3-ssr".to_string(),
-                        path: Path::new("/home/foo/dev/something/typo3-ssr").to_path_buf(),
+                        path: "/home/foo/dev/something/typo3-ssr".to_string(),
                     },
                 ),
             ];
@@ -102,7 +102,7 @@ mod tests {
                 "foo",
                 RecentFileSystemItem {
                     name: "mdCat".to_string(),
-                    path: Path::new("/home/foo/dev/foo").to_path_buf(),
+                    path: "/home/foo/dev/foo".to_string(),
                 },
             )];
             assert_eq!(do_match(&projects, &["Mdcat"]), ["foo"]);
@@ -114,7 +114,7 @@ mod tests {
                 "foo",
                 RecentFileSystemItem {
                     name: "bar".to_string(),
-                    path: Path::new("/home/foo/dev/mdcaT").to_path_buf(),
+                    path: "/home/foo/dev/mdcaT".to_string(),
                 },
             )];
             assert_eq!(do_match(&projects, &["Mdcat"]), ["foo"]);
@@ -128,14 +128,14 @@ mod tests {
                     RecentFileSystemItem {
                         name: "bar".to_string(),
                         // This matches foo as well because of /home/foo
-                        path: Path::new("/home/foo/dev/bar").to_path_buf(),
+                        path: "/home/foo/dev/bar".to_string(),
                     },
                 ),
                 (
                     "2",
                     RecentFileSystemItem {
                         name: "foo".to_string(),
-                        path: Path::new("/home/foo/dev/foo").to_path_buf(),
+                        path: "/home/foo/dev/foo".to_string(),
                     },
                 ),
             ];
@@ -150,14 +150,14 @@ mod tests {
                     RecentFileSystemItem {
                         name: "p1".to_string(),
                         // This matches foo as well because of /home/foo
-                        path: Path::new("/home/foo/dev/bar").to_path_buf(),
+                        path: "/home/foo/dev/bar".to_string(),
                     },
                 ),
                 (
                     "2",
                     RecentFileSystemItem {
                         name: "p1".to_string(),
-                        path: Path::new("/home/foo/dev/foo").to_path_buf(),
+                        path: "/home/foo/dev/foo".to_string(),
                     },
                 ),
             ];
