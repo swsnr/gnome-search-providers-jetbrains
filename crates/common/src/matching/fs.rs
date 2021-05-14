@@ -6,7 +6,7 @@
 
 //! Matching things from filesystems.
 
-use super::ScoreMatchable;
+use crate::{RecentItem, ScoreMatchable};
 
 /// A recent item from the file system.
 #[derive(Debug, PartialEq)]
@@ -43,6 +43,20 @@ impl ScoreMatchable for RecentFileSystemItem {
                 .map(|index| score + 1.0 * (index as f64 / path.len() as f64))
         });
         name_score.unwrap_or_default() + path_score.unwrap_or_default()
+    }
+}
+
+impl RecentItem for RecentFileSystemItem {
+    fn name(&self) -> &str {
+        &self.name
+    }
+
+    fn description(&self) -> &str {
+        &self.path
+    }
+
+    fn uri(&self) -> &str {
+        &self.path
     }
 }
 

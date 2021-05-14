@@ -6,7 +6,7 @@
 
 //! Utilities for matching stuff.
 
-use std::borrow::Borrow;
+use std::fmt::Display;
 
 pub use indexmap::IndexMap;
 
@@ -47,7 +47,7 @@ where
 {
     let mut matches: Vec<(f64, K)> = items
         .filter_map(move |(id, item)| {
-            let score = item.borrow().match_score(terms);
+            let score = item.match_score(terms);
             if 0.0 < score {
                 Some((score, id))
             } else {
@@ -66,7 +66,7 @@ pub type IdMap<I> = IndexMap<String, I>;
 /// A trait which denotes a source of matchable items.
 pub trait ItemsSource<T: ScoreMatchable> {
     /// The error
-    type Err;
+    type Err: Display;
 
     /// Find matchable items.
     fn find_recent_items(&self) -> Result<IdMap<T>, Self::Err>;

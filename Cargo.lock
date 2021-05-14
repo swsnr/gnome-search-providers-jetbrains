@@ -491,7 +491,11 @@ dependencies = [
 name = "gnome-search-provider-common"
 version = "0.1.0"
 dependencies = [
+ "gio",
  "indexmap",
+ "log",
+ "thiserror",
+ "zbus",
 ]
 
 [[package]]
@@ -513,7 +517,6 @@ dependencies = [
  "pretty_assertions",
  "regex",
  "rust-ini",
- "zbus",
 ]
 
 [[package]]

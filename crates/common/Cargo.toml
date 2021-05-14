@@ -12,3 +12,7 @@ publish = false
 
 [dependencies]
 indexmap = "^1.6"
+zbus = "^1.9"
+thiserror = "^1.0"
+log = "^0.4"
+gio = "^0.9"
