@@ -37,8 +37,8 @@ where
 ///
 /// `items` is an iterator over pairs of `(id, item)`.
 ///
-/// For each project compute the score with `MatchScore`; discard projects with zero score,
-/// and return a list of project IDs with non-zero score, ordered by score in descending order.
+/// For each item compute the score with `MatchScore`; discard projects with zero score,
+/// and return a list of item IDs with non-zero score, ordered by score in descending order.
 pub fn find_matching_items<'a, I, T, K, Item>(items: I, terms: &'a [T]) -> Vec<K>
 where
     I: Iterator<Item = (K, Item)> + 'a,

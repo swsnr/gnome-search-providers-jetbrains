@@ -71,20 +71,20 @@ mod tests {
 
         #[test]
         fn matches_something() {
-            let projects = vec![(
+            let items = vec![(
                 "foo",
                 RecentFileSystemItem {
                     name: "mdcat".to_string(),
                     path: "/home/foo/dev/mdcat".to_string(),
                 },
             )];
-            assert_eq!(do_match(&projects, &["mdcat"]), ["foo"]);
+            assert_eq!(do_match(&items, &["mdcat"]), ["foo"]);
         }
 
         /// Regression test for https://github.com/lunaryorn/gnome-search-providers-jetbrains/issues/7
         #[test]
-        fn do_not_find_undesired_projects() {
-            let projects = vec![
+        fn do_not_find_undesired_items() {
+            let items = vec![
                 (
                     "foo-1",
                     RecentFileSystemItem {
@@ -107,36 +107,36 @@ mod tests {
                     },
                 ),
             ];
-            assert!(do_match(&projects, &["flutter_test_app"]).is_empty());
+            assert!(do_match(&items, &["flutter_test_app"]).is_empty());
         }
 
         #[test]
         fn ignore_case_of_name() {
-            let projects = vec![(
+            let items = vec![(
                 "foo",
                 RecentFileSystemItem {
                     name: "mdCat".to_string(),
                     path: "/home/foo/dev/foo".to_string(),
                 },
             )];
-            assert_eq!(do_match(&projects, &["Mdcat"]), ["foo"]);
+            assert_eq!(do_match(&items, &["Mdcat"]), ["foo"]);
         }
 
         #[test]
         fn ignore_case_of_path() {
-            let projects = vec![(
+            let items = vec![(
                 "foo",
                 RecentFileSystemItem {
                     name: "bar".to_string(),
                     path: "/home/foo/dev/mdcaT".to_string(),
                 },
             )];
-            assert_eq!(do_match(&projects, &["Mdcat"]), ["foo"]);
+            assert_eq!(do_match(&items, &["Mdcat"]), ["foo"]);
         }
 
         #[test]
         fn matches_in_name_rank_higher() {
-            let projects = vec![
+            let items = vec![
                 (
                     "1",
                     RecentFileSystemItem {
@@ -153,12 +153,12 @@ mod tests {
                     },
                 ),
             ];
-            assert_eq!(do_match(&projects, &["foo"]), ["2", "1"]);
+            assert_eq!(do_match(&items, &["foo"]), ["2", "1"]);
         }
 
         #[test]
         fn matches_at_end_of_path_rank_higher() {
-            let projects = vec![
+            let items = vec![
                 (
                     "1",
                     RecentFileSystemItem {
@@ -175,7 +175,7 @@ mod tests {
                     },
                 ),
             ];
-            assert_eq!(do_match(&projects, &["foo"]), ["2", "1"]);
+            assert_eq!(do_match(&items, &["foo"]), ["2", "1"]);
         }
     }
 }

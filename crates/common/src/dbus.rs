@@ -180,7 +180,7 @@ impl<S: ItemsSource<T> + 'static, T: RecentItem + ScoreMatchable + Debug + 'stat
     /// This function is called when the user clicks on an individual result to open it in the application.
     /// The arguments are the result ID, the current search terms and a timestamp.
     ///
-    /// Launches the underlying Jetbrains app with the path to the selected project.
+    /// Launches the underlying app with the path to the selected item.
     fn activate_result(
         &self,
         id: String,
@@ -207,7 +207,7 @@ impl<S: ItemsSource<T> + 'static, T: RecentItem + ScoreMatchable + Debug + 'stat
                     ))
                 })
         } else {
-            error!("Project with ID {} not found", id);
+            error!("Item with ID {} not found", id);
             Err(zbus::fdo::Error::Failed(format!("Result {} not found", id)))
         }
     }
@@ -217,8 +217,7 @@ impl<S: ItemsSource<T> + 'static, T: RecentItem + ScoreMatchable + Debug + 'stat
     /// This function is called when the user clicks on the provider icon to display more search results in the application.
     /// The arguments are the current search terms and a timestamp.
     ///
-    /// We cannot remotely popup the project manager dialog of the underlying Jetbrains App; there's no such command line flag.
-    /// Hence we simply launch the app without any arguments to bring up the start screen if it's not yet running.
+    /// Currently it simply launches the app without any arguments.
     fn launch_search(&self, terms: Vec<String>, timestamp: u32) -> zbus::fdo::Result<()> {
         debug!("Launching search for {:?} at {}", terms, timestamp);
         info!("Launching app {} directly", self.app.get_id().unwrap());
