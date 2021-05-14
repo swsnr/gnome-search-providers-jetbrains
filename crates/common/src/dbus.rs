@@ -27,7 +27,7 @@ pub enum AcquireNameError {
     BusError(#[from] zbus::Error),
     /// The request to the bus name failed.
     #[error("Request to acquire name failed")]
-    FDOError(#[from] zbus::fdo::Error),
+    FdoError(#[from] zbus::fdo::Error),
     /// The call succeeded but the bus refused to hand us the requested name.
     #[error("Failed to acquire bus name {0}: {1:?}")]
     RequestNameRejected(String, RequestNameReply),
