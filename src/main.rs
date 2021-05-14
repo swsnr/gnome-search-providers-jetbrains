@@ -24,10 +24,11 @@ use gio::{AppInfoExt, IconExt};
 use lazy_static::lazy_static;
 use log::{debug, error, info, warn};
 use regex::Regex;
-use std::borrow::Borrow;
 use zbus::export::zvariant;
 use zbus::fdo::RequestNameReply;
 use zbus::{dbus_interface, fdo};
+
+use gnome_search_provider_common::*;
 
 /// A path with an associated version.
 #[derive(Debug)]
@@ -273,64 +274,34 @@ const PROVIDERS: &[ProviderDefinition] = &[
     },
 ];
 
-/// A recent project of a Jetbrains product.
-#[derive(Debug, PartialEq)]
-struct RecentProject {
-    /// The human readable name.
-    name: String,
-    /// The project directory.
-    path: PathBuf,
+struct JetbrainsProjectsSource<'a> {
+    app_id: String,
+    /// Where to look for the configuration and the list of recent projects.
+    config: &'a ConfigLocation<'a>,
 }
 
-/// Compute the score of matching `project` against `terms`.
-///
-/// If all terms match the name each term contributes a score of 10; this makes sure
-/// that precise matches in the name boost the score somewhat to the top.
-///
-/// If all terms match the path each term contributes 1 to score, scaled by the relative position
-/// of the right-most match, assuming that paths typically go from least to most specific segment,
-/// to the farther to the right a term matches the more specific it was.
-fn match_score<S: AsRef<str>>(project: &RecentProject, terms: &[S]) -> f64 {
-    let name = project.name.to_lowercase();
-    let path = project.path.to_string_lossy().to_lowercase();
-    let name_score = terms.iter().try_fold(0.0, |score, term| {
-        name.contains(&term.as_ref().to_lowercase())
-            .then(|| score + 10.0)
-            .ok_or(())
-    });
-    let path_score = terms.iter().try_fold(0.0, |score, term| {
-        path.rfind(&term.as_ref().to_lowercase())
-            .ok_or(())
-            .map(|index| score + 1.0 * (index as f64 / path.len() as f64))
-    });
-    name_score.unwrap_or_default() + path_score.unwrap_or_default()
-}
+impl<'a> ItemsSource<RecentFileSystemItem> for JetbrainsProjectsSource<'a> {
+    type Err = anyhow::Error;
 
-/// Find all projects from `projects` which match the given `terms`.
-///
-/// `projects` is an iterator over pairs of `(id, project)`.
-///
-/// For each project compute the score with `match_score`; discard projects with zero score,
-/// and return a list of project IDs with non-zero score, ordered by score in descending order.
-fn find_matching_projects<'a, I, S, T, P>(projects: I, terms: &'a [S]) -> Vec<T>
-where
-    I: Iterator<Item = (T, P)> + 'a,
-    P: Borrow<RecentProject>,
-    S: AsRef<str>,
-{
-    let mut matches: Vec<(f64, T)> = projects
-        .filter_map(move |(id, project)| {
-            let score = match_score(project.borrow(), terms);
-            if 0.0 < score {
-                Some((score, id))
-            } else {
-                None
+    fn find_recent_items(&self) -> Result<IdMap<RecentFileSystemItem>, Self::Err> {
+        info!("Searching recent projects for {}", self.app_id);
+        let mut items = IndexMap::new();
+        let config_home = dirs::config_dir().unwrap();
+        if let Some(projects_file) = self.config.find_latest_recent_projects_file(&config_home) {
+            for path in read_recent_jetbrains_projects(File::open(projects_file)?)? {
+                if let Some(name) = get_project_name(&path) {
+                    let id = format!(
+                        "jetbrains-recent-project-{}-{}",
+                        self.app_id,
+                        path.display()
+                    );
+                    items.insert(id, RecentFileSystemItem { name, path });
+                }
             }
-        })
-        .collect();
-    // Sort by score, descending
-    matches.sort_by(|(score_a, _), (score_b, _)| score_b.partial_cmp(score_a).unwrap());
-    matches.into_iter().map(move |(_, id)| id).collect()
+        };
+        info!("Found {} project(s) for {}", items.len(), self.app_id,);
+        Ok(items)
+    }
 }
 
 /// A DBus search provider for a Jetbrains app.
@@ -338,43 +309,9 @@ struct JetbrainsSearchProvider<'a> {
     /// The app to launch for search results.
     app: gio::DesktopAppInfo,
     /// Where to look for the configuration and the list of recent projects.
-    config: &'a ConfigLocation<'a>,
+    source: JetbrainsProjectsSource<'a>,
     /// All known recents projects.
-    projects: HashMap<String, RecentProject>,
-}
-
-impl<'a> JetbrainsSearchProvider<'a> {
-    /// Update recent projects.
-    ///
-    /// Clears the map of recent projects and reads the recent projects file again.
-    ///
-    /// If the file fails to read return the corresponding error and leave the map of projects empty.
-    fn update_recent_projects(&mut self) -> Result<()> {
-        info!(
-            "Updating recent projects for {}",
-            self.app.get_id().unwrap()
-        );
-        self.projects.clear();
-        let config_home = dirs::config_dir().unwrap();
-        if let Some(projects_file) = self.config.find_latest_recent_projects_file(&config_home) {
-            for path in read_recent_jetbrains_projects(File::open(projects_file)?)? {
-                if let Some(name) = get_project_name(&path) {
-                    let id = format!(
-                        "jetbrains-search-provider-{}-{}",
-                        self.app.get_id().unwrap(),
-                        path.display()
-                    );
-                    self.projects.insert(id, RecentProject { name, path });
-                }
-            }
-        };
-        info!(
-            "Found {} project(s) for {}",
-            self.projects.len(),
-            self.app.get_id().unwrap()
-        );
-        Ok(())
-    }
+    projects: IdMap<RecentFileSystemItem>,
 }
 
 /// The DBus interface of the search provider.
@@ -393,11 +330,10 @@ impl JetbrainsSearchProvider<'static> {
             terms,
             self.app.get_id().unwrap()
         );
-        self.update_recent_projects().map_err(|error| {
+        self.projects = self.source.find_recent_items().map_err(|error| {
             error!(
-                "Failed to update recent projects for {} at {:?}: {:#}",
+                "Failed to update recent projects for {}: {:#}",
                 self.app.get_id().unwrap(),
-                self.config,
                 error
             );
             zbus::fdo::Error::Failed(format!(
@@ -407,7 +343,7 @@ impl JetbrainsSearchProvider<'static> {
             ))
         })?;
 
-        let ids = find_matching_projects(self.projects.iter(), terms.as_slice())
+        let ids = find_matching_items(self.projects.iter(), terms.as_slice())
             .into_iter()
             .map(String::to_owned)
             .collect();
@@ -435,7 +371,7 @@ impl JetbrainsSearchProvider<'static> {
             .iter()
             .filter_map(|id| self.projects.get(id).map(|p| (id, p)));
 
-        let ids = find_matching_projects(candidates, terms.as_slice())
+        let ids = find_matching_items(candidates, terms.as_slice())
             .into_iter()
             .map(String::to_owned)
             .collect();
@@ -566,9 +502,12 @@ fn register_search_providers(object_server: &mut zbus::ObjectServer) -> Result<(
                 provider.objpath()
             );
             let dbus_provider = JetbrainsSearchProvider {
-                config: &provider.config,
+                source: JetbrainsProjectsSource {
+                    app_id: app.get_id().unwrap().to_string(),
+                    config: &provider.config,
+                },
                 app,
-                projects: HashMap::new(),
+                projects: IndexMap::new(),
             };
             object_server.at(&provider.objpath().try_into()?, dbus_provider)?;
         }
@@ -715,125 +654,6 @@ mod tests {
                     .join("gnome-search-providers-jetbrains")
             ]
         )
-    }
-
-    mod search {
-        use std::path::Path;
-
-        use crate::{find_matching_projects, RecentProject};
-
-        fn do_match<'a>(projects: &[(&'a str, RecentProject)], terms: &[&str]) -> Vec<&'a str> {
-            find_matching_projects(projects.iter().map(|(s, p)| (*s, p)), terms)
-        }
-
-        #[test]
-        fn matches_something() {
-            let projects = vec![(
-                "foo",
-                RecentProject {
-                    name: "mdcat".to_string(),
-                    path: Path::new("/home/foo/dev/mdcat").to_path_buf(),
-                },
-            )];
-            assert_eq!(do_match(&projects, &["mdcat"]), ["foo"]);
-        }
-
-        /// Regression test for https://github.com/lunaryorn/gnome-search-providers-jetbrains/issues/7
-        #[test]
-        fn do_not_find_undesired_projects() {
-            let projects = vec![
-                (
-                    "foo-1",
-                    RecentProject {
-                        name: "ui-pattern-library".to_string(),
-                        path: Path::new("/home/foo/dev/something/ui-pattern-library").to_path_buf(),
-                    },
-                ),
-                (
-                    "foo-2",
-                    RecentProject {
-                        name: "dauntless-builder".to_string(),
-                        path: Path::new("/home/foo/dev/dauntless-builder").to_path_buf(),
-                    },
-                ),
-                (
-                    "foo-3",
-                    RecentProject {
-                        name: "typo3-ssr".to_string(),
-                        path: Path::new("/home/foo/dev/something/typo3-ssr").to_path_buf(),
-                    },
-                ),
-            ];
-            assert!(do_match(&projects, &["flutter_test_app"]).is_empty());
-        }
-
-        #[test]
-        fn ignore_case_of_name() {
-            let projects = vec![(
-                "foo",
-                RecentProject {
-                    name: "mdCat".to_string(),
-                    path: Path::new("/home/foo/dev/foo").to_path_buf(),
-                },
-            )];
-            assert_eq!(do_match(&projects, &["Mdcat"]), ["foo"]);
-        }
-
-        #[test]
-        fn ignore_case_of_path() {
-            let projects = vec![(
-                "foo",
-                RecentProject {
-                    name: "bar".to_string(),
-                    path: Path::new("/home/foo/dev/mdcaT").to_path_buf(),
-                },
-            )];
-            assert_eq!(do_match(&projects, &["Mdcat"]), ["foo"]);
-        }
-
-        #[test]
-        fn matches_in_name_rank_higher() {
-            let projects = vec![
-                (
-                    "1",
-                    RecentProject {
-                        name: "bar".to_string(),
-                        // This matches foo as well because of /home/foo
-                        path: Path::new("/home/foo/dev/bar").to_path_buf(),
-                    },
-                ),
-                (
-                    "2",
-                    RecentProject {
-                        name: "foo".to_string(),
-                        path: Path::new("/home/foo/dev/foo").to_path_buf(),
-                    },
-                ),
-            ];
-            assert_eq!(do_match(&projects, &["foo"]), ["2", "1"]);
-        }
-
-        #[test]
-        fn matches_at_end_of_path_rank_higher() {
-            let projects = vec![
-                (
-                    "1",
-                    RecentProject {
-                        name: "p1".to_string(),
-                        // This matches foo as well because of /home/foo
-                        path: Path::new("/home/foo/dev/bar").to_path_buf(),
-                    },
-                ),
-                (
-                    "2",
-                    RecentProject {
-                        name: "p1".to_string(),
-                        path: Path::new("/home/foo/dev/foo").to_path_buf(),
-                    },
-                ),
-            ];
-            assert_eq!(do_match(&projects, &["foo"]), ["2", "1"]);
-        }
     }
 
     mod providers {

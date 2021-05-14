@@ -521,6 +521,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "gnome-search-provider-common"
+version = "0.1.0"
+dependencies = [
+ "indexmap",
+]
+
+[[package]]
 name = "gnome-search-providers-jetbrains"
 version = "1.3.0"
 dependencies = [
@@ -532,6 +539,7 @@ dependencies = [
  "gio",
  "glib",
  "globwalk",
+ "gnome-search-provider-common",
  "lazy_static",
  "libc",
  "log",
@@ -601,6 +609,16 @@ dependencies = [
  "thread_local",
  "walkdir",
  "winapi-util",
+]
+
+[[package]]
+name = "indexmap"
+version = "1.6.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "824845a0bf897a9042383849b02c1bc219c2383772efcd5c6f9766fa4b81aef3"
+dependencies = [
+ "autocfg",
+ "hashbrown",
 ]
 
 [[package]]

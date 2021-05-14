@@ -1,0 +1,14 @@
+[package]
+name = "gnome-search-provider-common"
+description = "Common code for Gnome search providers"
+version = "0.1.0"
+homepage = "https://github.com/lunaryorn/gnome-search-providers-jetbrains"
+repository = "https://github.com/lunaryorn/gnome-search-providers-jetbrains"
+authors = ["Sebastian Wiesner <sebastian@swsnr.de>"]
+edition = "2018"
+license = "MPL-2.0"
+# We don't publish this to crates.io; because it's purely used for my search providers as git dependency.
+publish = false
+
+[dependencies]
+indexmap = "^1.6"
