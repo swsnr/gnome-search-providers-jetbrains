@@ -13,17 +13,17 @@ use std::default::Default;
 use std::ffi::OsStr;
 use std::fs::File;
 use std::io::Read;
-use std::os::unix::io::AsRawFd;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result};
 use elementtree::Element;
 use lazy_static::lazy_static;
 use log::{debug, error, info, warn};
 use regex::Regex;
 
 use gnome_search_provider_common::dbus::{acquire_bus_name, RecentItemSearchProvider};
+use gnome_search_provider_common::mainloop::run_dbus_loop;
 use gnome_search_provider_common::*;
 
 /// A path with an associated version.
@@ -288,7 +288,7 @@ impl<'a> ItemsSource<RecentFileSystemItem> for JetbrainsProjectsSource<'a> {
             for path in read_recent_jetbrains_projects(File::open(projects_file)?)? {
                 if let Some(name) = get_project_name(&path) {
                     let id = format!("jetbrains-recent-project-{}-{}", self.app_id, path);
-                    items.insert(id, RecentFileSystemItem { name, path: path });
+                    items.insert(id, RecentFileSystemItem { name, path });
                 }
             }
         };
@@ -300,15 +300,6 @@ impl<'a> ItemsSource<RecentFileSystemItem> for JetbrainsProjectsSource<'a> {
 /// The name to request on the bus.
 const BUSNAME: &str = "de.swsnr.searchprovider.Jetbrains";
 
-/// Starts the DBUS service.
-///
-/// Connect to the session bus and register a new DBus object for every provider
-/// whose underlying app is installed.
-///
-/// Then register the connection on the Glib main loop and install a callback to
-/// handle incoming messages.
-///
-/// Return the connection and the source ID for the mainloop callback.
 fn register_search_providers(object_server: &mut zbus::ObjectServer) -> Result<()> {
     for provider in PROVIDERS {
         if let Some(app) = gio::DesktopAppInfo::new(provider.desktop_id) {
@@ -330,57 +321,34 @@ fn register_search_providers(object_server: &mut zbus::ObjectServer) -> Result<(
     Ok(())
 }
 
+/// Starts the DBUS service.
+///
+/// Connect to the session bus and register a new DBus object for every provider
+/// whose underlying app is installed.
+///
+/// Then register the connection on the Glib main loop and install a callback to
+/// handle incoming messages.
 fn start_dbus_service() -> Result<()> {
-    let context = glib::MainContext::default();
-    if !context.acquire() {
-        Err(anyhow!("Failed to acquire main context!"))
-    } else {
-        let mainloop = glib::MainLoop::new(Some(&context), false);
+    let connection =
+        zbus::Connection::new_session().with_context(|| "Failed to connect to session bus")?;
+    let mut object_server = zbus::ObjectServer::new(&connection);
 
-        let connection =
-            zbus::Connection::new_session().with_context(|| "Failed to connect to session bus")?;
-        let mut object_server = zbus::ObjectServer::new(&connection);
+    register_search_providers(&mut object_server)?;
+    info!("All providers registered, acquiring {}", BUSNAME);
+    acquire_bus_name(&connection, BUSNAME)?;
+    info!("Acquired name {}, handling DBus events", BUSNAME);
 
-        register_search_providers(&mut object_server)?;
-        info!("All providers registered, acquiring {}", BUSNAME);
-        acquire_bus_name(&connection, BUSNAME)?;
-        info!("Acquired name {}, handling DBus events", BUSNAME);
-
-        glib::source::unix_fd_add_local(
-            connection.as_raw_fd(),
-            glib::IOCondition::IN | glib::IOCondition::PRI,
-            move |_, condition| {
-                debug!("Connection entered IO condition {:?}", condition);
-                match object_server.try_handle_next() {
-                    Ok(None) => debug!("Interface message processed"),
-                    Ok(Some(message)) => warn!("Message not handled by interfaces: {:?}", message),
-                    Err(err) => error!("Failed to process message: {:#}", err),
-                };
-                glib::Continue(true)
-            },
-        );
-
-        glib::source::unix_signal_add(libc::SIGTERM, {
-            let l = mainloop.clone();
-            move || {
-                debug!("Terminated, quitting mainloop");
-                l.quit();
-                glib::Continue(false)
-            }
-        });
-
-        glib::source::unix_signal_add(libc::SIGINT, {
-            let l = mainloop.clone();
-            move || {
-                debug!("Interrupted, quitting mainloop");
-                l.quit();
-                glib::Continue(false)
-            }
-        });
-
-        mainloop.run();
-        Ok(())
-    }
+    run_dbus_loop(connection, move |message| {
+        match object_server.dispatch_message(&message) {
+            Ok(true) => debug!("Message dispatched to object server: {:?} ", message),
+            Ok(false) => warn!("Message not handled by object server: {:?}", message),
+            Err(error) => error!(
+                "Failed to dispatch message {:?} on object server: {}",
+                message, error
+            ),
+        }
+    })
+    .map_err(Into::into)
 }
 
 fn main() {
@@ -443,15 +411,21 @@ mod tests {
     fn read_recent_projects() {
         let data: &[u8] = include_bytes!("tests/recentProjects.xml");
         let home = dirs::home_dir().unwrap();
-        let projects = read_recent_jetbrains_projects(data).unwrap();
+        let items = read_recent_jetbrains_projects(data).unwrap();
 
         assert_eq!(
-            projects,
+            items,
             vec![
-                home.join("Code").join("gh").join("mdcat"),
+                home.join("Code")
+                    .join("gh")
+                    .join("mdcat")
+                    .to_string_lossy()
+                    .to_string(),
                 home.join("Code")
                     .join("gh")
                     .join("gnome-search-providers-jetbrains")
+                    .to_string_lossy()
+                    .to_string()
             ]
         )
     }

@@ -492,7 +492,9 @@ name = "gnome-search-provider-common"
 version = "0.1.0"
 dependencies = [
  "gio",
+ "glib",
  "indexmap",
+ "libc",
  "log",
  "thiserror",
  "zbus",
@@ -508,11 +510,9 @@ dependencies = [
  "elementtree",
  "env_logger",
  "gio",
- "glib",
  "globwalk",
  "gnome-search-provider-common",
  "lazy_static",
- "libc",
  "log",
  "pretty_assertions",
  "regex",

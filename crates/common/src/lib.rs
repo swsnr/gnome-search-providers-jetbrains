@@ -9,6 +9,7 @@
 #![deny(warnings, missing_docs, clippy::all)]
 
 pub mod dbus;
+pub mod mainloop;
 pub mod matching;
 
 pub use matching::fs::RecentFileSystemItem;
