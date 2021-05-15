@@ -8,7 +8,7 @@
 
 use std::collections::HashMap;
 
-use gio::{AppInfoExt, IconExt};
+use gio::{AppInfoExt, AppLaunchContextExt, IconExt};
 use indexmap::IndexMap;
 use log::{debug, error, info};
 use zbus::dbus_interface;
@@ -77,6 +77,7 @@ impl ScoreMatchable for AppLaunchItem {
 
 /// A search provider for recent items.
 pub struct AppItemSearchProvider<S: ItemsSource<AppLaunchItem>> {
+    launch_context: gio::AppLaunchContext,
     app: gio::DesktopAppInfo,
     source: S,
     items: IdMap<AppLaunchItem>,
@@ -87,7 +88,16 @@ impl<S: ItemsSource<AppLaunchItem>> AppItemSearchProvider<S> {
     ///
     /// Uses the given `source` to load recent items.
     pub fn new(app: gio::DesktopAppInfo, source: S) -> Self {
+        let launch_context = gio::AppLaunchContext::new();
+        launch_context.connect_launched(|_, info, platform_data| {
+            info!(
+                "App {} launched: {:?}",
+                info.get_id().unwrap(),
+                platform_data
+            );
+        });
         Self {
+            launch_context,
             app,
             source,
             items: IndexMap::new(),
@@ -214,11 +224,12 @@ impl<S: ItemsSource<AppLaunchItem> + 'static> AppItemSearchProvider<S> {
         if let Some(item) = self.items.get(&id) {
             info!("Launching recent item {:?}", item);
             match &item.target {
-                AppLaunchTarget::File(path) => self
-                    .app
-                    .launch::<gio::AppLaunchContext>(&[gio::File::new_for_path(path)], None),
+                AppLaunchTarget::File(path) => self.app.launch::<gio::AppLaunchContext>(
+                    &[gio::File::new_for_path(path)],
+                    Some(&self.launch_context),
+                ),
                 AppLaunchTarget::Uri(uri) => {
-                    self.app.launch_uris::<gio::AppLaunchContext>(&[uri], None)
+                    self.app.launch_uris(&[uri], Some(&self.launch_context))
                 }
             }
             .map_err(|error| {
@@ -251,7 +262,7 @@ impl<S: ItemsSource<AppLaunchItem> + 'static> AppItemSearchProvider<S> {
         debug!("Launching search for {:?} at {}", terms, timestamp);
         info!("Launching app {} directly", self.app.get_id().unwrap());
         self.app
-            .launch::<gio::AppLaunchContext>(&[], None)
+            .launch(&[], Some(&self.launch_context))
             .map_err(|error| {
                 error!(
                     "Failed to launch app {}: {:#}",
