@@ -10,8 +10,6 @@ use std::fmt::Display;
 
 pub use indexmap::IndexMap;
 
-pub mod fs;
-
 /// Match against a list of terms and return a score.
 pub trait ScoreMatchable {
     /// Match self against `terms` and return a score about how "well" self matches `terms`.

@@ -22,7 +22,8 @@ use lazy_static::lazy_static;
 use log::{debug, error, info, warn};
 use regex::Regex;
 
-use gnome_search_provider_common::dbus::{acquire_bus_name, RecentItemSearchProvider};
+use gnome_search_provider_common::app::{AppItemSearchProvider, AppLaunchTarget};
+use gnome_search_provider_common::dbus::acquire_bus_name;
 use gnome_search_provider_common::mainloop::run_dbus_loop;
 use gnome_search_provider_common::*;
 
@@ -277,10 +278,10 @@ struct JetbrainsProjectsSource<'a> {
     config: &'a ConfigLocation<'a>,
 }
 
-impl<'a> ItemsSource<RecentFileSystemItem> for JetbrainsProjectsSource<'a> {
+impl<'a> ItemsSource<AppLaunchItem> for JetbrainsProjectsSource<'a> {
     type Err = anyhow::Error;
 
-    fn find_recent_items(&self) -> Result<IdMap<RecentFileSystemItem>, Self::Err> {
+    fn find_recent_items(&self) -> Result<IdMap<AppLaunchItem>, Self::Err> {
         info!("Searching recent projects for {}", self.app_id);
         let mut items = IndexMap::new();
         let config_home = dirs::config_dir().unwrap();
@@ -288,7 +289,13 @@ impl<'a> ItemsSource<RecentFileSystemItem> for JetbrainsProjectsSource<'a> {
             for path in read_recent_jetbrains_projects(File::open(projects_file)?)? {
                 if let Some(name) = get_project_name(&path) {
                     let id = format!("jetbrains-recent-project-{}-{}", self.app_id, path);
-                    items.insert(id, RecentFileSystemItem { name, path });
+                    items.insert(
+                        id,
+                        AppLaunchItem {
+                            name,
+                            target: AppLaunchTarget::File(path),
+                        },
+                    );
                 }
             }
         };
@@ -308,7 +315,7 @@ fn register_search_providers(object_server: &mut zbus::ObjectServer) -> Result<(
                 provider.desktop_id,
                 provider.objpath()
             );
-            let dbus_provider = RecentItemSearchProvider::new(
+            let dbus_provider = AppItemSearchProvider::new(
                 app,
                 JetbrainsProjectsSource {
                     app_id: provider.desktop_id.to_string(),

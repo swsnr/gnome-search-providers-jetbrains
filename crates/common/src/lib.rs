@@ -8,23 +8,11 @@
 
 #![deny(warnings, missing_docs, clippy::all)]
 
+pub use app::AppLaunchItem;
+pub use matching::{find_matching_items, IdMap, IndexMap, ItemsSource, ScoreMatchable};
+pub use zbus;
+
+pub mod app;
 pub mod dbus;
 pub mod mainloop;
 pub mod matching;
-
-pub use matching::fs::RecentFileSystemItem;
-pub use matching::{find_matching_items, IdMap, IndexMap, ItemsSource, ScoreMatchable};
-
-pub use zbus;
-
-/// A recent item for a search provider.
-pub trait RecentItem {
-    /// The name of a recent item.
-    fn name(&self) -> &str;
-
-    /// The description.
-    fn description(&self) -> &str;
-
-    /// Get the URI to open this item.
-    fn uri(&self) -> &str;
-}
