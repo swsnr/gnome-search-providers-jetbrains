@@ -55,23 +55,23 @@ pub fn run_dbus_loop<F: FnMut(zbus::Message) + 'static>(
 
         source_add_connection_local(connection, on_message);
 
-        glib::source::unix_signal_add(libc::SIGTERM, {
-            let l = mainloop.clone();
-            move || {
+        glib::source::unix_signal_add(
+            libc::SIGTERM,
+            glib::clone!(@strong mainloop =>  move || {
                 debug!("Terminated, quitting mainloop");
-                l.quit();
+                mainloop.quit();
                 glib::Continue(false)
-            }
-        });
+            }),
+        );
 
-        glib::source::unix_signal_add(libc::SIGINT, {
-            let l = mainloop.clone();
-            move || {
+        glib::source::unix_signal_add(
+            libc::SIGINT,
+            glib::clone!(@strong mainloop =>  move || {
                 debug!("Interrupted, quitting mainloop");
-                l.quit();
+                mainloop.quit();
                 glib::Continue(false)
-            }
-        });
+            }),
+        );
 
         mainloop.run();
         Ok(())
