@@ -157,7 +157,7 @@ impl<S: ItemsSource<T> + 'static, T: RecentItem + ScoreMatchable + Debug + 'stat
             .into_iter()
             .filter_map(|id| {
                 self.items.get(&id).map(|item| {
-                    debug!("Compiling meta infor for {}", id);
+                    debug!("Compiling meta info for {}", id);
                     let icon = IconExt::to_string(&self.app.get_icon().unwrap()).unwrap();
                     debug!("Using icon {} for id {}", icon, id);
 
