@@ -9,11 +9,14 @@
 use std::collections::HashMap;
 
 use gio::{AppInfoExt, AppLaunchContextExt, IconExt};
+use glib::VariantDict;
 use indexmap::IndexMap;
-use log::{debug, error, info};
+use libc::pid_t;
+use log::{debug, error, info, warn};
 use zbus::dbus_interface;
 use zbus::export::zvariant;
 
+use crate::systemd::{Systemd1ManagerExt, Systemd1ManagerProxy};
 use crate::{find_matching_items, IdMap, ItemsSource, ScoreMatchable};
 
 /// A target for launching an app.
@@ -88,14 +91,33 @@ impl<S: ItemsSource<AppLaunchItem>> AppItemSearchProvider<S> {
     /// Create a new search provider for recent items of `app`.
     ///
     /// Uses the given `source` to load recent items.
-    pub fn new(app: gio::DesktopAppInfo, source: S) -> Self {
+    pub fn new(
+        app: gio::DesktopAppInfo,
+        source: S,
+        systemd: Systemd1ManagerProxy<'static>,
+    ) -> Self {
         let launch_context = gio::AppLaunchContext::new();
-        launch_context.connect_launched(|_, info, platform_data| {
-            info!(
-                "App {} launched: {:?}",
-                info.get_id().unwrap(),
-                platform_data
-            );
+        launch_context.connect_launched(move |_, app, platform_data| {
+            match platform_data
+                .get::<VariantDict>()
+                .and_then(|data| data.lookup_value("pid", None))
+                .and_then(|value| value.get::<pid_t>())
+            {
+                None => warn!(
+                    "Failed to get PID of launched application from {:?}",
+                    platform_data
+                ),
+                Some(pid) => {
+                    info!("App {} launched with PID {}", app.get_id().unwrap(), pid);
+                    // Gnome also strips the .desktop suffix from IDs, see
+                    // https://gitlab.gnome.org/GNOME/gnome-desktop/-/blob/106a729c3f98b8ee56823a0a49fa8504f78dd355/libgnome-desktop/gnome-systemd.c#L227
+                    let id = app.get_id().unwrap();
+                    match systemd.start_app_scope(id.trim_end_matches(".desktop"), app.get_description().as_ref().map(|d| d.as_str()), pid) {
+                        Err(err) => error!("Failed to move running process {} of app {} into new systemd scope: {}", pid, app.get_id().unwrap(), err),
+                        Ok((name, path)) => info!("Moved running process {} of app {} into new systemd scope {} at {}", pid, app.get_id().unwrap(), &name, path.into_inner()),
+                    }
+                }
+            }
         });
         Self {
             launch_context,
@@ -282,8 +304,9 @@ impl<S: ItemsSource<AppLaunchItem> + 'static> AppItemSearchProvider<S> {
 #[cfg(test)]
 mod tests {
     mod search {
-        use crate::app::AppLaunchTarget;
-        use crate::{find_matching_items, AppLaunchItem};
+        use pretty_assertions::assert_eq;
+
+        use crate::{find_matching_items, AppLaunchItem, AppLaunchTarget};
 
         fn do_match<'a>(items: &[(&'a str, AppLaunchItem)], terms: &[&str]) -> Vec<&'a str> {
             find_matching_items(items.iter().map(|(s, p)| (*s, p)), terms)

@@ -8,7 +8,6 @@
 
 //! Gnome search provider for Jetbrains products
 
-use std::convert::TryInto;
 use std::default::Default;
 use std::ffi::OsStr;
 use std::fs::File;
@@ -22,9 +21,9 @@ use lazy_static::lazy_static;
 use log::{debug, error, info, warn};
 use regex::Regex;
 
-use gnome_search_provider_common::app::{AppItemSearchProvider, AppLaunchTarget};
 use gnome_search_provider_common::dbus::acquire_bus_name;
 use gnome_search_provider_common::mainloop::run_dbus_loop;
+use gnome_search_provider_common::systemd::Systemd1ManagerProxy;
 use gnome_search_provider_common::*;
 
 /// A path with an associated version.
@@ -307,7 +306,10 @@ impl<'a> ItemsSource<AppLaunchItem> for JetbrainsProjectsSource<'a> {
 /// The name to request on the bus.
 const BUSNAME: &str = "de.swsnr.searchprovider.Jetbrains";
 
-fn register_search_providers(object_server: &mut zbus::ObjectServer) -> Result<()> {
+fn register_search_providers(
+    connection: &zbus::Connection,
+    object_server: &mut zbus::ObjectServer,
+) -> Result<()> {
     for provider in PROVIDERS {
         if let Some(app) = gio::DesktopAppInfo::new(provider.desktop_id) {
             info!(
@@ -321,8 +323,10 @@ fn register_search_providers(object_server: &mut zbus::ObjectServer) -> Result<(
                     app_id: provider.desktop_id.to_string(),
                     config: &provider.config,
                 },
+                Systemd1ManagerProxy::new(&connection)
+                    .with_context(|| "Failed to access systemd manager via DBUS")?,
             );
-            object_server.at(&provider.objpath().try_into()?, dbus_provider)?;
+            object_server.at(provider.objpath().as_str(), dbus_provider)?;
         }
     }
     Ok(())
@@ -338,9 +342,10 @@ fn register_search_providers(object_server: &mut zbus::ObjectServer) -> Result<(
 fn start_dbus_service() -> Result<()> {
     let connection =
         zbus::Connection::new_session().with_context(|| "Failed to connect to session bus")?;
+
     let mut object_server = zbus::ObjectServer::new(&connection);
 
-    register_search_providers(&mut object_server)?;
+    register_search_providers(&connection, &mut object_server)?;
     info!("All providers registered, acquiring {}", BUSNAME);
     acquire_bus_name(&connection, BUSNAME)?;
     info!("Acquired name {}, handling DBus events", BUSNAME);

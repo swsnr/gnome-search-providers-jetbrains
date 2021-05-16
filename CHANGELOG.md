@@ -6,8 +6,15 @@ and this project doesn't really care for versioning.
 
 ## [Unreleased]
 
+### Changed
+- Move launched processes to new `app-gnome` systemd scopes, like Gnome itself does when starting applications:
+  - Prevents systemd from killing IDE processes launched by the search provider when stopping the search provider service (see below).
+  - Improves resource control, because systemd now tracks resource usage of launched IDEs separate from the search provider.
+    * This improves interaction with e.g. systemd-oomd because the search provider no longer implicitly aggregates resource usage of all launched IDEs; thus when running into a OOM situation after launching many IDEs through the search provider systemd-oomd will only kill specific IDEs with excessive memory consumption not all IDEs and the search provider at once.
+
 ### Fixed
 - Correctly detect overridden names of projects.
+- No longer quit application instances launched by the search provider when stopping the search provider service; the search provider now moves processes to new systemd scopes to prevent this.
 
 ## [1.3.0] – 2021-04-25
 

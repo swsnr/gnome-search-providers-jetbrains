@@ -8,7 +8,7 @@
 
 #![deny(warnings, missing_docs, clippy::all)]
 
-pub use app::AppLaunchItem;
+pub use app::{AppItemSearchProvider, AppLaunchItem, AppLaunchTarget};
 pub use matching::{find_matching_items, IdMap, IndexMap, ItemsSource, ScoreMatchable};
 pub use zbus;
 
@@ -16,3 +16,4 @@ pub mod app;
 pub mod dbus;
 pub mod mainloop;
 pub mod matching;
+pub mod systemd;
