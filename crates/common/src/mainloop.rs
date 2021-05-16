@@ -24,6 +24,9 @@ pub enum MainLoopError {
 /// Add `connection` as source to the default Glib mainloop.
 ///
 /// Invoke `on_message` for every message received from `connection`.
+///
+/// `on_message` is not required to be `Send` but the calling thread needs to
+/// own the main context to make sure that `on_message` remains on the main thread.
 pub fn source_add_connection_local<F: FnMut(zbus::Message) + 'static>(
     connection: zbus::Connection,
     mut on_message: F,
