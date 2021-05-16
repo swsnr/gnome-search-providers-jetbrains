@@ -56,10 +56,11 @@ impl ScoreMatchable for AppLaunchItem {
     /// to the farther to the right a term matches the more specific it was.
     fn match_score<S: AsRef<str>>(&self, terms: &[S]) -> f64 {
         let name = self.name.to_lowercase();
-        let target: &str = match &self.target {
-            AppLaunchTarget::Uri(uri) => &uri,
-            AppLaunchTarget::File(file) => &file,
-        };
+        let target = match &self.target {
+            AppLaunchTarget::Uri(uri) => uri,
+            AppLaunchTarget::File(file) => file,
+        }
+        .to_lowercase();
         let name_score = terms.iter().try_fold(0.0, |score, term| {
             name.contains(&term.as_ref().to_lowercase())
                 .then(|| score + 10.0)
@@ -281,9 +282,10 @@ impl<S: ItemsSource<AppLaunchItem> + 'static> AppItemSearchProvider<S> {
 #[cfg(test)]
 mod tests {
     mod search {
-        use crate::{find_matching_items, RecentFileSystemItem};
+        use crate::app::AppLaunchTarget;
+        use crate::{find_matching_items, AppLaunchItem};
 
-        fn do_match<'a>(items: &[(&'a str, RecentFileSystemItem)], terms: &[&str]) -> Vec<&'a str> {
+        fn do_match<'a>(items: &[(&'a str, AppLaunchItem)], terms: &[&str]) -> Vec<&'a str> {
             find_matching_items(items.iter().map(|(s, p)| (*s, p)), terms)
         }
 
@@ -291,9 +293,9 @@ mod tests {
         fn matches_something() {
             let items = vec![(
                 "foo",
-                RecentFileSystemItem {
+                AppLaunchItem {
                     name: "mdcat".to_string(),
-                    path: "/home/foo/dev/mdcat".to_string(),
+                    target: AppLaunchTarget::File("/home/foo/dev/mdcat".to_string()),
                 },
             )];
             assert_eq!(do_match(&items, &["mdcat"]), ["foo"]);
@@ -305,23 +307,29 @@ mod tests {
             let items = vec![
                 (
                     "foo-1",
-                    RecentFileSystemItem {
+                    AppLaunchItem {
                         name: "ui-pattern-library".to_string(),
-                        path: "/home/foo/dev/something/ui-pattern-library".to_string(),
+                        target: AppLaunchTarget::File(
+                            "/home/foo/dev/something/ui-pattern-library".to_string(),
+                        ),
                     },
                 ),
                 (
                     "foo-2",
-                    RecentFileSystemItem {
+                    AppLaunchItem {
                         name: "dauntless-builder".to_string(),
-                        path: "/home/foo/dev/dauntless-builder".to_string(),
+                        target: AppLaunchTarget::File(
+                            "/home/foo/dev/dauntless-builder".to_string(),
+                        ),
                     },
                 ),
                 (
                     "foo-3",
-                    RecentFileSystemItem {
+                    AppLaunchItem {
                         name: "typo3-ssr".to_string(),
-                        path: "/home/foo/dev/something/typo3-ssr".to_string(),
+                        target: AppLaunchTarget::File(
+                            "/home/foo/dev/something/typo3-ssr".to_string(),
+                        ),
                     },
                 ),
             ];
@@ -332,9 +340,9 @@ mod tests {
         fn ignore_case_of_name() {
             let items = vec![(
                 "foo",
-                RecentFileSystemItem {
+                AppLaunchItem {
                     name: "mdCat".to_string(),
-                    path: "/home/foo/dev/foo".to_string(),
+                    target: AppLaunchTarget::File("/home/foo/dev/foo".to_string()),
                 },
             )];
             assert_eq!(do_match(&items, &["Mdcat"]), ["foo"]);
@@ -344,9 +352,9 @@ mod tests {
         fn ignore_case_of_path() {
             let items = vec![(
                 "foo",
-                RecentFileSystemItem {
+                AppLaunchItem {
                     name: "bar".to_string(),
-                    path: "/home/foo/dev/mdcaT".to_string(),
+                    target: AppLaunchTarget::File("/home/foo/dev/mdcaT".to_string()),
                 },
             )];
             assert_eq!(do_match(&items, &["Mdcat"]), ["foo"]);
@@ -357,17 +365,17 @@ mod tests {
             let items = vec![
                 (
                     "1",
-                    RecentFileSystemItem {
+                    AppLaunchItem {
                         name: "bar".to_string(),
                         // This matches foo as well because of /home/foo
-                        path: "/home/foo/dev/bar".to_string(),
+                        target: AppLaunchTarget::File("/home/foo/dev/bar".to_string()),
                     },
                 ),
                 (
                     "2",
-                    RecentFileSystemItem {
+                    AppLaunchItem {
                         name: "foo".to_string(),
-                        path: "/home/foo/dev/foo".to_string(),
+                        target: AppLaunchTarget::File("/home/foo/dev/foo".to_string()),
                     },
                 ),
             ];
@@ -379,17 +387,17 @@ mod tests {
             let items = vec![
                 (
                     "1",
-                    RecentFileSystemItem {
+                    AppLaunchItem {
                         name: "p1".to_string(),
                         // This matches foo as well because of /home/foo
-                        path: "/home/foo/dev/bar".to_string(),
+                        target: AppLaunchTarget::File("/home/foo/dev/bar".to_string()),
                     },
                 ),
                 (
                     "2",
-                    RecentFileSystemItem {
+                    AppLaunchItem {
                         name: "p1".to_string(),
-                        path: "/home/foo/dev/foo".to_string(),
+                        target: AppLaunchTarget::File("/home/foo/dev/foo".to_string()),
                     },
                 ),
             ];
