@@ -46,7 +46,7 @@ fn read_recent_jetbrains_projects<R: Read>(reader: R) -> Result<Vec<String>> {
 
     let projects = element
         .find_all("component")
-        .find(|e| e.get_attr("name") == Some("RecentProjectsManager"))
+        .find(|e| e.get_attr("name") == Some("RecentProjectsManager") || e.get_attr("name") == Some("RiderRecentProjectsManager"))
         .and_then(|comp| {
             comp.find_all("option")
                 .find(|e| e.get_attr("name") == Some("additionalInfo"))
