@@ -46,7 +46,10 @@ fn read_recent_jetbrains_projects<R: Read>(reader: R) -> Result<Vec<String>> {
 
     let projects = element
         .find_all("component")
-        .find(|e| e.get_attr("name") == Some("RecentProjectsManager") || e.get_attr("name") == Some("RiderRecentProjectsManager"))
+        .find(|e| {
+            e.get_attr("name") == Some("RecentProjectsManager")
+                || e.get_attr("name") == Some("RiderRecentProjectsManager")
+        })
         .and_then(|comp| {
             comp.find_all("option")
                 .find(|e| e.get_attr("name") == Some("additionalInfo"))
@@ -422,6 +425,29 @@ mod tests {
     #[test]
     fn read_recent_projects() {
         let data: &[u8] = include_bytes!("tests/recentProjects.xml");
+        let home = dirs::home_dir().unwrap();
+        let items = read_recent_jetbrains_projects(data).unwrap();
+
+        assert_eq!(
+            items,
+            vec![
+                home.join("Code")
+                    .join("gh")
+                    .join("mdcat")
+                    .to_string_lossy()
+                    .to_string(),
+                home.join("Code")
+                    .join("gh")
+                    .join("gnome-search-providers-jetbrains")
+                    .to_string_lossy()
+                    .to_string()
+            ]
+        )
+    }
+
+    #[test]
+    fn read_recent_solutions() {
+        let data: &[u8] = include_bytes!("tests/recentSolutions.xml");
         let home = dirs::home_dir().unwrap();
         let items = read_recent_jetbrains_projects(data).unwrap();
 
