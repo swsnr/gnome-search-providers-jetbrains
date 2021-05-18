@@ -39,10 +39,10 @@ I do **not** support or endorse these repositories, **use at your own risk.**
 
 1. Install [rust](https://www.rust-lang.org/tools/install)
 
-2. **Debian only:** Make sure `libgtk-3-dev` is installed, if not install it with `sudo apt install libgtk-3-dev`.
+2. **Debian only:** Make sure `libgtk-3-dev` is installed; if not install it with `sudo apt install libgtk-3-dev`.
 
-3. Build ```$ make build```
-4. Install `$ sudo make install`
+3. Build `make build`
+4. Install `sudo make install`
    
    This installs to `/usr/local/`.
 
@@ -50,7 +50,8 @@ I do **not** support or endorse these repositories, **use at your own risk.**
    A per-user installation to `$HOME` does not work as of Gnome 40, because Gnome shell doesn't load search providers from `$HOME` (see <https://gitlab.gnome.org/GNOME/gnome-shell/-/issues/3060>).
 
 ## Uninstallation 
-To uninstall use `$ sudo make uninstall`.
+
+To uninstall use `sudo make uninstall`.
 
 ## License
 
