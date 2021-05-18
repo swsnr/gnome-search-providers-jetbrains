@@ -6,6 +6,15 @@ and this project doesn't really care for versioning.
 
 ## [Unreleased]
 
+### Fixed
+
+- Correctly parse recent solutions from Rider (see [GH-12] and [GH-13], thanks [axelgenus]).
+
+[GH-12]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/issues/12 
+[GH-13]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/pull/13 
+
+[axelgenus]: https://github.com/axelgenus
+
 ## [1.4.0] – 2021-05-16
 
 ### Changed
