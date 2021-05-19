@@ -6,6 +6,8 @@ and this project doesn't really care for versioning.
 
 ## [Unreleased]
 
+## [1.4.1] – 2021-05-19
+
 ### Fixed
 
 - Correctly parse recent solutions from Rider (see [GH-12] and [GH-13], thanks [axelgenus]).
@@ -88,7 +90,8 @@ and this project doesn't really care for versioning.
 
 Initial prototype in Python, with support for Toolbox IDEA CE and WebStorm.
 
-[Unreleased]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/compare/v1.4.1...HEAD
+[1.4.1]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/compare/v1.2.3...v1.3.0
 [1.2.3]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/compare/v1.2.2...v1.2.3
