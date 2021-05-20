@@ -25,6 +25,7 @@ env_logger = "^0.8"
 log = "^0.4"
 clap = { version = "^2.33", default-features = false }
 gnome-search-provider-common = { path = "./crates/common" }
+systemd = "^0.8"
 
 [dev-dependencies]
 pretty_assertions = "^0.7"

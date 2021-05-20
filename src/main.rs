@@ -20,11 +20,14 @@ use elementtree::Element;
 use lazy_static::lazy_static;
 use log::{debug, error, info, warn};
 use regex::Regex;
+use systemd::JournalLog;
 
+use gnome_search_provider_common::app::*;
 use gnome_search_provider_common::dbus::acquire_bus_name;
+use gnome_search_provider_common::export::zbus;
 use gnome_search_provider_common::mainloop::run_dbus_loop;
+use gnome_search_provider_common::matching::*;
 use gnome_search_provider_common::systemd::Systemd1ManagerProxy;
-use gnome_search_provider_common::*;
 
 /// A path with an associated version.
 #[derive(Debug)]
@@ -382,6 +385,11 @@ Set $RUST_LOG to control the log level",
             Arg::with_name("providers")
                 .long("--providers")
                 .help("List all providers"),
+        )
+        .arg(
+            Arg::with_name("journal_log")
+                .long("--journal-log")
+                .help("Directly log to the systemd journal instead of stdout"),
         );
     let matches = app.get_matches();
     if matches.is_present("providers") {
@@ -391,7 +399,17 @@ Set $RUST_LOG to control the log level",
             println!("{}", label)
         }
     } else {
-        env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
+        if matches.is_present("journal_log") {
+            JournalLog::init().unwrap();
+            log::set_max_level(log::LevelFilter::Info)
+        } else {
+            env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
+                .init();
+        }
+
+        if std::env::var_os("LOG_DEBUG").is_some() {
+            log::set_max_level(log::LevelFilter::Debug)
+        }
 
         info!(
             "Started jetbrains search provider version: {}",

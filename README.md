@@ -39,7 +39,7 @@ I do **not** support or endorse these repositories, **use at your own risk.**
 
 1. Install [rust](https://www.rust-lang.org/tools/install)
 
-2. **Debian only:** Make sure `libgtk-3-dev` is installed; if not install it with `sudo apt install libgtk-3-dev`.
+2. **Debian only:** Install `libgtk-3-dev` and `libsystemd-dev`.
 
 3. Build `make build`
 4. Install `sudo make install`
