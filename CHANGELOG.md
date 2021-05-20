@@ -6,6 +6,16 @@ and this project doesn't really care for versioning.
 
 ## [Unreleased]
 
+### Added
+- Enable debug logging if `$LOG_DEBUG` is set (see [GH-17]).
+- Add `--journal-log` to log directly to the systemd journal; this adds a dependency on the `systemd` crate and, by implication, libsystemd (see [GH-17]).
+  Consequently this program no longer builds if systemd is not installed.
+
+### Changed
+- The systemd service now logs directly to the systemd journal; this improves representation of log levels in logging (see [GH-17]).
+
+[GH-17]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/pull/17
+
 ## [1.4.1] – 2021-05-19
 
 ### Fixed

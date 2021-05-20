@@ -16,8 +16,8 @@ use log::{debug, error, info, warn};
 use zbus::dbus_interface;
 use zbus::export::zvariant;
 
+use crate::matching::*;
 use crate::systemd::{Systemd1ManagerExt, Systemd1ManagerProxy};
-use crate::{find_matching_items, IdMap, ItemsSource, ScoreMatchable};
 
 /// A target for launching an app.
 #[derive(Debug, PartialEq)]
@@ -306,7 +306,8 @@ mod tests {
     mod search {
         use pretty_assertions::assert_eq;
 
-        use crate::{find_matching_items, AppLaunchItem, AppLaunchTarget};
+        use crate::app::{AppLaunchItem, AppLaunchTarget};
+        use crate::matching::find_matching_items;
 
         fn do_match<'a>(items: &[(&'a str, AppLaunchItem)], terms: &[&str]) -> Vec<&'a str> {
             find_matching_items(items.iter().map(|(s, p)| (*s, p)), terms)

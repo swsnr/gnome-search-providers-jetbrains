@@ -4,4 +4,4 @@ Description=Jetbrains projects search provider for Gnome shell
 [Service]
 Type=dbus
 BusName=de.swsnr.searchprovider.Jetbrains
-ExecStart={PREFIX}/lib/gnome-search-providers-jetbrains/gnome-search-providers-jetbrains
+ExecStart={PREFIX}/lib/gnome-search-providers-jetbrains/gnome-search-providers-jetbrains --journal-log
