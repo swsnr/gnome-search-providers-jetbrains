@@ -13,6 +13,7 @@ pub mod dbus;
 pub mod mainloop;
 pub mod matching;
 pub mod systemd;
+pub mod util;
 
 /// Re-exports.
 pub mod export {

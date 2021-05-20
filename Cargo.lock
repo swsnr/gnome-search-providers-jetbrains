@@ -549,12 +549,14 @@ dependencies = [
 name = "gnome-search-provider-common"
 version = "0.1.0"
 dependencies = [
+ "env_logger",
  "gio",
  "glib",
  "indexmap",
  "libc",
  "log",
  "pretty_assertions",
+ "systemd",
  "thiserror",
  "zbus",
 ]
@@ -567,7 +569,6 @@ dependencies = [
  "clap",
  "dirs",
  "elementtree",
- "env_logger",
  "gio",
  "globwalk",
  "gnome-search-provider-common",
@@ -576,7 +577,6 @@ dependencies = [
  "pretty_assertions",
  "regex",
  "rust-ini",
- "systemd",
 ]
 
 [[package]]

@@ -8,7 +8,6 @@
 
 //! Gnome search provider for Jetbrains products
 
-use std::default::Default;
 use std::ffi::OsStr;
 use std::fs::File;
 use std::io::Read;
@@ -20,7 +19,6 @@ use elementtree::Element;
 use lazy_static::lazy_static;
 use log::{debug, error, info, warn};
 use regex::Regex;
-use systemd::JournalLog;
 
 use gnome_search_provider_common::app::*;
 use gnome_search_provider_common::dbus::acquire_bus_name;
@@ -28,6 +26,7 @@ use gnome_search_provider_common::export::zbus;
 use gnome_search_provider_common::mainloop::run_dbus_loop;
 use gnome_search_provider_common::matching::*;
 use gnome_search_provider_common::systemd::Systemd1ManagerProxy;
+use gnome_search_provider_common::util::*;
 
 /// A path with an associated version.
 #[derive(Debug)]
@@ -399,20 +398,15 @@ Set $RUST_LOG to control the log level",
             println!("{}", label)
         }
     } else {
-        if matches.is_present("journal_log") {
-            JournalLog::init().unwrap();
-            log::set_max_level(log::LevelFilter::Info)
+        setup_logging(if matches.is_present("journal_log") {
+            LogDestination::Journal
         } else {
-            env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
-                .init();
-        }
-
-        if std::env::var_os("LOG_DEBUG").is_some() {
-            log::set_max_level(log::LevelFilter::Debug)
-        }
+            LogDestination::Stdout
+        });
 
         info!(
-            "Started jetbrains search provider version: {}",
+            "Started {} version: {}",
+            env!("CARGO_BIN_NAME"),
             env!("CARGO_PKG_VERSION")
         );
 
