@@ -6,6 +6,8 @@ and this project doesn't really care for versioning.
 
 ## [Unreleased]
 
+## [1.5.0] – 2021-05-25
+
 ### Added
 - Enable debug logging if `$LOG_DEBUG` is set (see [GH-17]).
 - Add `--journal-log` to log directly to the systemd journal; this adds a dependency on the `systemd` crate and, by implication, libsystemd (see [GH-17]).
@@ -101,7 +103,8 @@ and this project doesn't really care for versioning.
 
 Initial prototype in Python, with support for Toolbox IDEA CE and WebStorm.
 
-[Unreleased]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/compare/v1.4.1...HEAD
+[Unreleased]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/compare/v1.4.1...v1.5.0
 [1.4.1]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/compare/v1.2.3...v1.3.0
