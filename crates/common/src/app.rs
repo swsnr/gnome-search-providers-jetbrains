@@ -17,7 +17,7 @@ use zbus::dbus_interface;
 use zbus::export::zvariant;
 
 use crate::matching::*;
-use crate::systemd::{Systemd1ManagerExt, Systemd1ManagerProxy};
+use crate::systemd::{ScopeProperties, Systemd1ManagerExt, Systemd1ManagerProxy};
 
 /// A target for launching an app.
 #[derive(Debug, PartialEq)]
@@ -79,6 +79,17 @@ impl ScoreMatchable for AppLaunchItem {
     }
 }
 
+/// Settings for systemd scopes created by a search provider for launched apps.
+#[derive(Debug)]
+pub struct SystemdScopeSettings {
+    /// The prefix for scope names.
+    pub prefix: String,
+    /// A string which identifies the app which started the scope.
+    pub started_by: String,
+    /// Optional documentation URLs for the scope.
+    pub documentation: Vec<String>,
+}
+
 /// A search provider for recent items.
 pub struct AppItemSearchProvider<S: ItemsSource<AppLaunchItem>> {
     launch_context: gio::AppLaunchContext,
@@ -95,6 +106,7 @@ impl<S: ItemsSource<AppLaunchItem>> AppItemSearchProvider<S> {
         app: gio::DesktopAppInfo,
         source: S,
         systemd: Systemd1ManagerProxy<'static>,
+        scope_settings: SystemdScopeSettings,
     ) -> Self {
         let launch_context = gio::AppLaunchContext::new();
         launch_context.connect_launched(move |_, app, platform_data| {
@@ -112,7 +124,15 @@ impl<S: ItemsSource<AppLaunchItem>> AppItemSearchProvider<S> {
                     // Gnome also strips the .desktop suffix from IDs, see
                     // https://gitlab.gnome.org/GNOME/gnome-desktop/-/blob/106a729c3f98b8ee56823a0a49fa8504f78dd355/libgnome-desktop/gnome-systemd.c#L227
                     let id = app.get_id().unwrap();
-                    match systemd.start_app_scope(id.trim_end_matches(".desktop"), app.get_description().as_ref().map(|d| d.as_str()), pid) {
+                    let description = app.get_description()
+                        .map_or_else(|| format!("app started by {}", scope_settings.started_by), |value| format!("{} started by {}", value, scope_settings.started_by));
+                    let properties = ScopeProperties {
+                        prefix: &scope_settings.prefix,
+                        name: id.trim_end_matches(".desktop"),
+                        description: Some(description.as_str()),
+                        documentation: scope_settings.documentation.iter().map(|v| v.as_str()).collect(),
+                    };
+                    match systemd.start_app_scope(properties, pid) {
                         Err(err) => error!("Failed to move running process {} of app {} into new systemd scope: {}", pid, app.get_id().unwrap(), err),
                         Ok((name, path)) => info!("Moved running process {} of app {} into new systemd scope {} at {}", pid, app.get_id().unwrap(), &name, path.into_inner()),
                     }

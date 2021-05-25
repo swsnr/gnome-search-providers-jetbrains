@@ -330,6 +330,11 @@ fn register_search_providers(
                 },
                 Systemd1ManagerProxy::new(&connection)
                     .with_context(|| "Failed to access systemd manager via DBUS")?,
+                SystemdScopeSettings {
+                    prefix: concat!("app-", env!("CARGO_BIN_NAME")).to_string(),
+                    started_by: env!("CARGO_BIN_NAME").to_string(),
+                    documentation: vec![env!("CARGO_PKG_HOMEPAGE").to_string()],
+                },
             );
             object_server.at(provider.objpath().as_str(), dbus_provider)?;
         }

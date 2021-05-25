@@ -7,6 +7,7 @@
 //! Systemd utilities.
 
 use libc::pid_t;
+use log::debug;
 use zbus::dbus_proxy;
 use zbus::export::zvariant::{OwnedObjectPath, Value};
 
@@ -34,23 +35,42 @@ pub trait Systemd1Manager {
     ) -> zbus::Result<OwnedObjectPath>;
 }
 
+/// Properties for a new systemd scope.
+#[derive(Debug)]
+pub struct ScopeProperties<'a> {
+    /// The prefix to prepend before the scope name.
+    ///
+    /// This string is prepended **literally**, and not escaped.
+    ///
+    /// It must be a valid string for a systemd unit.
+    pub prefix: &'a str,
+    /// The name for the scope.
+    ///
+    /// This string gets escaped for systemd and can be arbitrary.
+    pub name: &'a str,
+    /// The optional description for the unit.
+    ///
+    /// This is used by systemd (and other UIs) as the label for the unit,
+    /// so this string should identify the unit rather than describe it, despite the name.
+    ///
+    /// See `systemd.unit(5)` for more information.
+    pub description: Option<&'a str>,
+    /// The optional documentation URLs for the unit.
+    pub documentation: Vec<&'a str>,
+}
+
 /// Extensions to the systemd1 Manager API.
 pub trait Systemd1ManagerExt {
     /// Start a new systemd application scope for a running process.
     ///
-    /// `name` is the name for the new scope; it gets combined with a prefix and
-    /// the `pid` to make a unique scope name.
-    ///
-    /// `description` is a human-readable string to use as description for the new scope which will
-    /// appear e.g. in `systemctl` output.
+    /// `properties` provides the name and the metadata for the new scope.
     ///
     /// `pid` is the process ID of the process to move into a new scope.
     ///
     /// Return the complete name and the DBUS object path of the new scope unit if successful.
     fn start_app_scope(
         &self,
-        name: &str,
-        description: Option<&str>,
+        properties: ScopeProperties,
         pid: pid_t,
     ) -> zbus::Result<(String, OwnedObjectPath)>;
 }
@@ -84,8 +104,7 @@ impl Systemd1ManagerExt for Systemd1ManagerProxy<'_> {
     // for inspiration.
     fn start_app_scope(
         &self,
-        name: &str,
-        description: Option<&str>,
+        properties: ScopeProperties,
         pid: pid_t,
     ) -> zbus::Result<(String, OwnedObjectPath)> {
         // See https://www.freedesktop.org/wiki/Software/systemd/ControlGroupInterface/ for background.
@@ -103,12 +122,26 @@ impl Systemd1ManagerExt for Systemd1ManagerProxy<'_> {
             // I'm not entirely sure how it's relevant but it seems a good idea to do what Gnome does.
             ("CollectMode", Value::Str("inactive-or-failed".into())),
         ];
-        if let Some(description) = description {
-            props.push(("Description", Value::Str(description.into())))
+        if let Some(description) = properties.description {
+            props.push(("Description", Value::Str(description.into())));
+        }
+        if !properties.documentation.is_empty() {
+            props.push((
+                "Documentation",
+                Value::Array(properties.documentation.into()),
+            ))
         }
         // This is roughly what Gnome itself does when it moves a new process to a systemd scope, see
         // https://gitlab.gnome.org/GNOME/gnome-desktop/-/blob/106a729c3f98b8ee56823a0a49fa8504f78dd355/libgnome-desktop/gnome-systemd.c#L81
-        let name = format!("app-gnome-{}-{}.scope", systemd_escape(name), pid);
+        //
+        // Gnome Shell uses a the app-gnome prefix; we make the prefix configurable to allow callers to identify their new scopes.
+        let name = format!(
+            "{}-{}-{}.scope",
+            properties.prefix,
+            systemd_escape(&properties.name),
+            pid
+        );
+        debug!("Creating new scope {} for {}", &name, pid);
         // We `fail` to start the scope if it already exists.
         self.start_transient_unit(&name, "fail", props, Vec::new())
             .map(|objpath| (name, objpath))

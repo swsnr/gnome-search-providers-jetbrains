@@ -13,6 +13,7 @@ and this project doesn't really care for versioning.
 
 ### Changed
 - The systemd service now logs directly to the systemd journal; this improves representation of log levels in logging (see [GH-17]).
+- Rename scopes for running IDE instances to clarify the origin of the scope, and distinguish apps started from the search provider from apps started by Gnome Shell.
 
 [GH-17]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/pull/17
 
