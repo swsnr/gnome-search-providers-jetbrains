@@ -20,11 +20,11 @@ pub enum LogDestination {
 /// The maximum level is set to "info", unless the `$LOG_DEBUG` environment variable is set in which case it's "debug".
 pub fn setup_logging(destination: LogDestination) {
     match destination {
-        LogDestination::Stdout => {
+        LogDestination::Journal => {
             systemd::JournalLog::init().unwrap();
             log::set_max_level(log::LevelFilter::Info);
         }
-        LogDestination::Journal => {
+        LogDestination::Stdout => {
             env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
                 .init();
         }
