@@ -83,8 +83,7 @@ fn systemd_escape(s: &str) -> String {
     for b in s.bytes() {
         match b {
             b'/' => escaped.push('-'),
-            // _ is not escaped, and '.' only at the beginning (see below).
-            // Not sure about :, see https://github.com/systemd/systemd/issues/19623
+            // _ and : are not escaped, and '.' only at the beginning (see below).
             b'.' | b'_' | b':' => escaped.push(b as char),
             // ASCII alpha numberic chars are not escaped
             _ if b.is_ascii_alphanumeric() => escaped.push(b as char),
@@ -167,8 +166,28 @@ mod tests {
         }
 
         #[test]
-        fn ascii_unescaped() {
+        fn literal_plain_ascii() {
             assert_eq!(systemd_escape("test"), "test");
+        }
+
+        #[test]
+        fn literal_colon() {
+            assert_eq!(systemd_escape("a:b"), "a:b");
+        }
+
+        #[test]
+        fn literal_underscore() {
+            assert_eq!(systemd_escape("a_b"), "a_b");
+        }
+
+        #[test]
+        fn literal_dot() {
+            assert_eq!(systemd_escape("a.b"), "a.b");
+        }
+
+        #[test]
+        fn escape_leading_dot() {
+            assert_eq!(systemd_escape(".foo"), expected_escaped(".foo").unwrap());
         }
 
         #[test]
@@ -177,17 +196,6 @@ mod tests {
                 systemd_escape("Hallöchen, Meister"),
                 expected_escaped("Hallöchen, Meister").unwrap()
             );
-        }
-
-        #[test]
-        fn escape_colon() {
-            // See https://github.com/systemd/systemd/issues/19623
-            assert_eq!(systemd_escape("a:b"), expected_escaped("a:b").unwrap());
-        }
-
-        #[test]
-        fn escape_leading_dot() {
-            assert_eq!(systemd_escape(".foo"), expected_escaped(".foo").unwrap());
         }
     }
 }
