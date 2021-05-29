@@ -1,30 +1,39 @@
 DESTDIR =
 PREFIX = /usr/local
 
-SEARCH_PROVIDERS_DIR = $(DESTDIR)/$(PREFIX)/share/gnome-shell/search-providers
-LIBDIR = $(DESTDIR)/$(PREFIX)/lib
-DATADIR = $(DESTDIR)/$(PREFIX)/share
+## Files are installed into these three base directories.
+# The path to install the service executable (gnome-search-providers-jetbrains)
+LIBEXECDIR = $(PREFIX)/lib/gnome-search-providers-jetbrains
+
+# The path to install systemd user units in
+USERUNITDIR = $(PREFIX)/lib/systemd/user
+
+# The base path for dbus services and gnome-shell search providers
+DATADIR = $(PREFIX)/share
+DBUS_SERVICES_DIR = $(DATADIR)/dbus-1/services
+SEARCH_PROVIDERS_DIR = $(DATADIR)/gnome-shell/search-providers
 
 SEARCH_PROVIDERS = $(wildcard providers/*.ini)
 
 .PHONY: build
 build:
 	cargo build --release --locked
-	mkdir -p target/dbus-1 target/systemd
-	sed "s:{PREFIX}:$(PREFIX):g" "dbus-1/de.swsnr.searchprovider.Jetbrains.service" > "target/dbus-1/de.swsnr.searchprovider.Jetbrains.service"
-	sed "s:{PREFIX}:$(PREFIX):g" "systemd/de.swsnr.searchprovider.Jetbrains.service" > "target/systemd/de.swsnr.searchprovider.Jetbrains.service"
-
 
 .PHONY: install
 install: build
-	install -Dm644 -t $(SEARCH_PROVIDERS_DIR) $(SEARCH_PROVIDERS)
-	install -Dm755 -t $(LIBDIR)/gnome-search-providers-jetbrains/ target/release/gnome-search-providers-jetbrains
-	install -Dm644 -t $(LIBDIR)/systemd/user/ target/systemd/de.swsnr.searchprovider.Jetbrains.service
-	install -Dm644 -t $(DATADIR)/dbus-1/services target/dbus-1/de.swsnr.searchprovider.Jetbrains.service
+	mkdir -p target/dbus-1 target/systemd
+	sed "s:{LIBEXECDIR}:$(LIBEXECDIR):g" "dbus-1/de.swsnr.searchprovider.Jetbrains.service" > "target/dbus-1/de.swsnr.searchprovider.Jetbrains.service"
+	sed "s:{LIBEXECDIR}:$(LIBEXECDIR):g" "systemd/de.swsnr.searchprovider.Jetbrains.service" > "target/systemd/de.swsnr.searchprovider.Jetbrains.service"
+
+	install -Dm644 -t $(DESTDIR)$(SEARCH_PROVIDERS_DIR) $(SEARCH_PROVIDERS)
+	install -Dm755 -t $(DESTDIR)$(LIBEXECDIR) target/release/gnome-search-providers-jetbrains
+	install -Dm644 -t $(DESTDIR)$(USERUNITDIR) target/systemd/de.swsnr.searchprovider.Jetbrains.service
+	install -Dm644 -t $(DESTDIR)$(DBUS_SERVICES_DIR) target/dbus-1/de.swsnr.searchprovider.Jetbrains.service
 
 .PHONY: uninstall
 uninstall:
-	rm -f $(addprefix $(SEARCH_PROVIDERS_DIR)/,$(notdir $(SEARCH_PROVIDERS)))
-	rm -rf $(LIBDIR)/gnome-search-providers-jetbrains/
-	rm -f $(LIBDIR)/systemd/user/de.swsnr.searchprovider.Jetbrains.service
-	rm -f $(DATADIR)/dbus-1/services/de.swsnr.searchprovider.Jetbrains.service
+	rm -f $(addprefix $(DESTDIR)$(SEARCH_PROVIDERS_DIR)/,$(notdir $(SEARCH_PROVIDERS)))
+	rm -rf $(DESTDIR)$(LIBEXECDIR)/
+	rm -f $(DESTDIR)$(USERUNITDIR)/de.swsnr.searchprovider.Jetbrains.service
+	rm -f $(DESTDIR)$(DBUS_SERVICES_DIR)/de.swsnr.searchprovider.Jetbrains.service
+
