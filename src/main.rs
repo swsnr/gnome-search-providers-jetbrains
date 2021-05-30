@@ -389,11 +389,6 @@ Set $RUST_LOG to control the log level",
             Arg::with_name("providers")
                 .long("--providers")
                 .help("List all providers"),
-        )
-        .arg(
-            Arg::with_name("journal_log")
-                .long("--journal-log")
-                .help("Directly log to the systemd journal instead of stdout"),
         );
     let matches = app.get_matches();
     if matches.is_present("providers") {
@@ -403,11 +398,7 @@ Set $RUST_LOG to control the log level",
             println!("{}", label)
         }
     } else {
-        setup_logging(if matches.is_present("journal_log") {
-            LogDestination::Journal
-        } else {
-            LogDestination::Stdout
-        });
+        setup_logging_for_service();
 
         info!(
             "Started {} version: {}",

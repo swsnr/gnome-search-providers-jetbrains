@@ -6,6 +6,12 @@ and this project doesn't really care for versioning.
 
 ## [Unreleased]
 
+### Added
+- Automatically detect whether to log to the systemd journal.
+
+### Removed
+- Remove `--journal-log` flag. 
+
 ## [1.5.0] – 2021-05-25
 
 ### Added

@@ -11,6 +11,17 @@ use log::debug;
 use zbus::dbus_proxy;
 use zbus::export::zvariant::{OwnedObjectPath, Value};
 
+/// Whether the standard error of this process is connected to the systemd journal.
+///
+/// Checks whether `$JOURNAL_STREAM` is set and non-empty.
+///
+/// See [systemd.exec][1] for more information.
+///
+/// [1]: https://www.freedesktop.org/software/systemd/man/systemd.exec.html#Environment%20Variables%20in%20Spawned%20Processes
+pub fn connected_to_journal() -> bool {
+    std::env::var_os("JOURNAL_STREAM").map_or(false, |s| !s.is_empty())
+}
+
 /// The systemd manager DBUS API.
 ///
 /// See <https://www.freedesktop.org/wiki/Software/systemd/dbus/>
