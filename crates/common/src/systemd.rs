@@ -89,24 +89,21 @@ pub trait Systemd1ManagerExt {
 /// Escape a string for use in a systemd unit name.
 ///
 /// See <https://www.freedesktop.org/software/systemd/man/systemd.unit.html#String%20Escaping%20for%20Inclusion%20in%20Unit%20Names>
-fn systemd_escape(s: &str) -> String {
-    let mut escaped = String::with_capacity(s.len());
-    for b in s.bytes() {
+fn escape_name(s: &str) -> String {
+    let mut escaped = String::with_capacity(s.len() * 2);
+    for (index, b) in s.bytes().enumerate() {
         match b {
             b'/' => escaped.push('-'),
-            // _ and : are not escaped, and '.' only at the beginning (see below).
-            b'.' | b'_' | b':' => escaped.push(b as char),
-            // ASCII alpha numberic chars are not escaped
-            _ if b.is_ascii_alphanumeric() => escaped.push(b as char),
+            // Do not escape '.' unless it's the first character
+            b'.' if 0 < index => escaped.push(char::from(b)),
+            // Do not escaoe _ and : and
+            b'_' | b':' => escaped.push(char::from(b)),
+            // all ASCII alpha numeric characters
+            _ if b.is_ascii_alphanumeric() => escaped.push(char::from(b)),
             _ => escaped.push_str(&format!("\\x{:02x}", b)),
         }
     }
-    // systemd requires a leading dot (and only a leading dot) to be escaped.
-    if escaped.starts_with('.') {
-        escaped.replacen('.', "\\x2e", 1)
-    } else {
-        escaped
-    }
+    escaped
 }
 
 impl Systemd1ManagerExt for Systemd1ManagerProxy<'_> {
@@ -148,7 +145,7 @@ impl Systemd1ManagerExt for Systemd1ManagerProxy<'_> {
         let name = format!(
             "{}-{}-{}.scope",
             properties.prefix,
-            systemd_escape(&properties.name),
+            escape_name(&properties.name),
             pid
         );
         debug!("Creating new scope {} for {}", &name, pid);
@@ -160,53 +157,21 @@ impl Systemd1ManagerExt for Systemd1ManagerProxy<'_> {
 
 #[cfg(test)]
 mod tests {
+    use pretty_assertions::assert_eq;
 
-    mod systemd_escape {
-        use crate::systemd::systemd_escape;
+    #[test]
+    fn escape_name() {
+        let samples = vec![
+            // (input, escaped)
+            ("test", "test"),
+            ("a:b_c.d", "a:b_c.d"),
+            ("/foo/", "-foo-"),
+            (".foo", "\\x2efoo"),
+            ("Hallöchen, Meister", "Hall\\xc3\\xb6chen\\x2c\\x20Meister"),
+        ];
 
-        use pretty_assertions::assert_eq;
-
-        fn expected_escaped(s: &str) -> std::io::Result<String> {
-            use std::process::Command;
-            let output = Command::new("systemd-escape").arg(s).output()?;
-            assert!(output.status.success());
-            Ok(String::from_utf8(output.stdout)
-                .expect("systemd-escape returned non-UTF-8 data")
-                .trim_end()
-                .to_string())
-        }
-
-        #[test]
-        fn literal_plain_ascii() {
-            assert_eq!(systemd_escape("test"), "test");
-        }
-
-        #[test]
-        fn literal_colon() {
-            assert_eq!(systemd_escape("a:b"), "a:b");
-        }
-
-        #[test]
-        fn literal_underscore() {
-            assert_eq!(systemd_escape("a_b"), "a_b");
-        }
-
-        #[test]
-        fn literal_dot() {
-            assert_eq!(systemd_escape("a.b"), "a.b");
-        }
-
-        #[test]
-        fn escape_leading_dot() {
-            assert_eq!(systemd_escape(".foo"), expected_escaped(".foo").unwrap());
-        }
-
-        #[test]
-        fn escape_non_ascii() {
-            assert_eq!(
-                systemd_escape("Hallöchen, Meister"),
-                expected_escaped("Hallöchen, Meister").unwrap()
-            );
+        for (input, expected) in samples {
+            assert_eq!(super::escape_name(input), expected);
         }
     }
 }
