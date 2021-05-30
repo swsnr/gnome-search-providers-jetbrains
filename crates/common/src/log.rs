@@ -4,7 +4,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-//! Misc utilities.
+//! Logging setup
 
 /// Where to log to.
 #[derive(Debug, PartialEq, Copy, Clone)]

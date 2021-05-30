@@ -23,10 +23,10 @@ use regex::Regex;
 use gnome_search_provider_common::app::*;
 use gnome_search_provider_common::dbus::acquire_bus_name;
 use gnome_search_provider_common::export::zbus;
+use gnome_search_provider_common::log::*;
 use gnome_search_provider_common::mainloop::run_dbus_loop;
 use gnome_search_provider_common::matching::*;
 use gnome_search_provider_common::systemd::Systemd1ManagerProxy;
-use gnome_search_provider_common::util::*;
 
 /// A path with an associated version.
 #[derive(Debug)]
