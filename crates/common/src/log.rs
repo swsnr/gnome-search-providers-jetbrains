@@ -6,21 +6,29 @@
 
 //! Logging setup
 
-/// Setup logging for the given `destination`.
-///
-/// If `$JOURNAL_STREAM` is set and non-empty directly log to the systemd journal,
-/// as per [systemd.exec](https://www.freedesktop.org/software/systemd/man/systemd.exec.html#Environment%20Variables%20in%20Spawned%20Processes).
-///
-/// The maximum level is set to "info", unless the `$LOG_DEBUG` environment variable is set in which case it's "debug".
-pub fn setup_logging_for_service() {
-    if crate::systemd::connected_to_journal() {
-        systemd::JournalLog::init().unwrap();
-        log::set_max_level(log::LevelFilter::Info);
-    } else {
-        env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
-    }
+use slog::{Drain, Logger, OwnedKV, SendSyncRefUnwindSafeKV};
+use slog_journald::JournaldDrain;
 
-    if std::env::var_os("LOG_DEBUG").is_some() {
-        log::set_max_level(log::LevelFilter::Debug)
+/// Create a logger for a systemd service.
+///
+/// If the current process is connected to the systemd journal log create a
+/// logger which directly logs to the systemd journal to retain structured attributes.
+///
+/// Otherwise it falls back to terminal output on standard error.
+pub fn create_service_logger<T>(options: OwnedKV<T>) -> Logger
+where
+    T: SendSyncRefUnwindSafeKV + 'static,
+{
+    if crate::systemd::connected_to_journal() {
+        slog::Logger::root(
+            slog_envlogger::new(JournaldDrain.ignore_res()).fuse(),
+            options,
+        )
+    } else {
+        let stderr = slog_term::PlainSyncDecorator::new(std::io::stderr());
+        slog::Logger::root(
+            slog_envlogger::new(slog_term::FullFormat::new(stderr).build()).fuse(),
+            options,
+        )
     }
 }

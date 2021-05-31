@@ -7,7 +7,7 @@
 //! Systemd utilities.
 
 use libc::pid_t;
-use log::debug;
+use slog::{debug, trace, Logger};
 use zbus::dbus_proxy;
 use zbus::export::zvariant::{OwnedObjectPath, Value};
 
@@ -70,22 +70,6 @@ pub struct ScopeProperties<'a> {
     pub documentation: Vec<&'a str>,
 }
 
-/// Extensions to the systemd1 Manager API.
-pub trait Systemd1ManagerExt {
-    /// Start a new systemd application scope for a running process.
-    ///
-    /// `properties` provides the name and the metadata for the new scope.
-    ///
-    /// `pid` is the process ID of the process to move into a new scope.
-    ///
-    /// Return the complete name and the DBUS object path of the new scope unit if successful.
-    fn start_app_scope(
-        &self,
-        properties: ScopeProperties,
-        pid: pid_t,
-    ) -> zbus::Result<(String, OwnedObjectPath)>;
-}
-
 /// Escape a string for use in a systemd unit name.
 ///
 /// See <https://www.freedesktop.org/software/systemd/man/systemd.unit.html#String%20Escaping%20for%20Inclusion%20in%20Unit%20Names>
@@ -106,14 +90,36 @@ fn escape_name(s: &str) -> String {
     escaped
 }
 
-impl Systemd1ManagerExt for Systemd1ManagerProxy<'_> {
-    // See https://gitlab.gnome.org/jf/start-transient-unit/-/blob/117c6f32c8dc0d1f28686408f698632aa71880bc/rust/src/main.rs#L94
-    // for inspiration.
-    fn start_app_scope(
+/// The systemd manager on DBus.
+pub struct Systemd1Manager {
+    logger: Logger,
+    proxy: Systemd1ManagerProxy<'static>,
+}
+
+impl Systemd1Manager {
+    /// Connect to the systemd manager on the given `connection`.
+    ///
+    /// Use the given `logger` for logging.
+    pub fn new(logger: Logger, connection: &zbus::Connection) -> zbus::Result<Self> {
+        debug!(logger, "Connecting to systemd on {:?}", connection);
+        Systemd1ManagerProxy::new(connection).map(|proxy| Self { logger, proxy })
+    }
+
+    /// Start a new systemd application scope for a running process.
+    ///
+    /// `properties` provides the name and the metadata for the new scope.
+    ///
+    /// `pid` is the process ID of the process to move into a new scope.
+    ///
+    /// Return the complete name and the DBUS object path of the new scope unit if successful.
+    pub fn start_app_scope(
         &self,
         properties: ScopeProperties,
         pid: pid_t,
     ) -> zbus::Result<(String, OwnedObjectPath)> {
+        // See https://gitlab.gnome.org/jf/start-transient-unit/-/blob/117c6f32c8dc0d1f28686408f698632aa71880bc/rust/src/main.rs#L94
+        // for inspiration.
+        //
         // See https://www.freedesktop.org/wiki/Software/systemd/ControlGroupInterface/ for background.
         let mut props = vec![
             // I haven't found any documentation for the type of the PIDs property, but
@@ -148,10 +154,24 @@ impl Systemd1ManagerExt for Systemd1ManagerProxy<'_> {
             escape_name(&properties.name),
             pid
         );
-        debug!("Creating new scope {} for {}", &name, pid);
+        debug!(self.logger, "Creating new scope {} for {}", &name, pid);
+        trace!(
+            self.logger,
+            "StartTransientUnit({}, fail, {:?}, Vec::new)",
+            &name,
+            props,
+        );
         // We `fail` to start the scope if it already exists.
-        self.start_transient_unit(&name, "fail", props, Vec::new())
-            .map(|objpath| (name, objpath))
+        let result = self
+            .proxy
+            .start_transient_unit(&name, "fail", props, Vec::new());
+        trace!(
+            self.logger,
+            "StartTransientUnit({}, fail, ..., Vec::new) -> {:?}",
+            &name,
+            &result,
+        );
+        result.map(|objpath| (name, objpath))
     }
 }
 

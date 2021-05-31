@@ -12,12 +12,12 @@ use gio::{AppInfoExt, AppLaunchContextExt, IconExt};
 use glib::VariantDict;
 use indexmap::IndexMap;
 use libc::pid_t;
-use log::{debug, error, info, warn};
+use slog::{debug, error, info, trace, warn, Logger};
 use zbus::dbus_interface;
 use zbus::export::zvariant;
 
 use crate::matching::*;
-use crate::systemd::{ScopeProperties, Systemd1ManagerExt, Systemd1ManagerProxy};
+use crate::systemd::{ScopeProperties, Systemd1Manager};
 
 /// A target for launching an app.
 #[derive(Debug, PartialEq)]
@@ -92,6 +92,7 @@ pub struct SystemdScopeSettings {
 
 /// A search provider for recent items.
 pub struct AppItemSearchProvider<S: ItemsSource<AppLaunchItem>> {
+    log: Logger,
     launch_context: gio::AppLaunchContext,
     app: gio::DesktopAppInfo,
     source: S,
@@ -103,24 +104,26 @@ impl<S: ItemsSource<AppLaunchItem>> AppItemSearchProvider<S> {
     ///
     /// Uses the given `source` to load recent items.
     pub fn new(
+        log: Logger,
         app: gio::DesktopAppInfo,
         source: S,
-        systemd: Systemd1ManagerProxy<'static>,
+        systemd: Systemd1Manager,
         scope_settings: SystemdScopeSettings,
     ) -> Self {
         let launch_context = gio::AppLaunchContext::new();
-        launch_context.connect_launched(move |_, app, platform_data| {
+        launch_context.connect_launched(glib::clone!(@strong log => move |_, app, platform_data| {
             match platform_data
                 .get::<VariantDict>()
                 .and_then(|data| data.lookup_value("pid", None))
                 .and_then(|value| value.get::<pid_t>())
             {
                 None => warn!(
+                    log,
                     "Failed to get PID of launched application from {:?}",
                     platform_data
                 ),
                 Some(pid) => {
-                    info!("App {} launched with PID {}", app.get_id().unwrap(), pid);
+                    info!(log, "App {} launched with PID {}", app.get_id().unwrap(), pid);
                     // Gnome also strips the .desktop suffix from IDs, see
                     // https://gitlab.gnome.org/GNOME/gnome-desktop/-/blob/106a729c3f98b8ee56823a0a49fa8504f78dd355/libgnome-desktop/gnome-systemd.c#L227
                     let id = app.get_id().unwrap();
@@ -133,13 +136,14 @@ impl<S: ItemsSource<AppLaunchItem>> AppItemSearchProvider<S> {
                         documentation: scope_settings.documentation.iter().map(|v| v.as_str()).collect(),
                     };
                     match systemd.start_app_scope(properties, pid) {
-                        Err(err) => error!("Failed to move running process {} of app {} into new systemd scope: {}", pid, app.get_id().unwrap(), err),
-                        Ok((name, path)) => info!("Moved running process {} of app {} into new systemd scope {} at {}", pid, app.get_id().unwrap(), &name, path.into_inner()),
+                        Err(err) => error!(log, "Failed to move running process {} of app {} into new systemd scope: {}", pid, app.get_id().unwrap(), err),
+                        Ok((name, path)) => info!(log, "Moved running process {} of app {} into new systemd scope {} at {}", pid, app.get_id().unwrap(), &name, path.into_inner()),
                     }
                 }
             }
-        });
+        }));
         Self {
+            log,
             launch_context,
             app,
             source,
@@ -159,16 +163,13 @@ impl<S: ItemsSource<AppLaunchItem> + 'static> AppItemSearchProvider<S> {
     /// and should return an array of result IDs. gnome-shell will call GetResultMetas for (some) of these result
     /// IDs to get details about the result that can be be displayed in the result list.
     fn get_initial_result_set(&mut self, terms: Vec<String>) -> zbus::fdo::Result<Vec<String>> {
-        debug!(
-            "Searching for {:?} of {}",
-            terms,
-            self.app.get_id().unwrap()
-        );
+        trace!(self.log, "GetInitialResultSet({:?})", terms,);
         self.items = self.source.find_recent_items().map_err(|error| {
             error!(
+                self.log,
                 "Failed to update recent items for {}: {:#}",
-                self.app.get_id().unwrap(),
-                error
+                self.app.get_id().unwrap().as_str(),
+                error,
             );
             zbus::fdo::Error::Failed(format!(
                 "Failed to update recent items for {}: {:#}",
@@ -181,7 +182,13 @@ impl<S: ItemsSource<AppLaunchItem> + 'static> AppItemSearchProvider<S> {
             .into_iter()
             .map(String::to_owned)
             .collect();
-        debug!("Found ids {:?} for {}", ids, self.app.get_id().unwrap());
+        debug!(
+            self.log,
+            "Found ids {:?} for {}",
+            ids,
+            self.app.get_id().unwrap().as_str(),
+        );
+        trace!(self.log, "GetInitialResultSet({:?}) -> {:?}", terms, ids,);
         Ok(ids)
     }
 
@@ -195,11 +202,11 @@ impl<S: ItemsSource<AppLaunchItem> + 'static> AppItemSearchProvider<S> {
         previous_results: Vec<String>,
         terms: Vec<String>,
     ) -> Vec<String> {
-        debug!(
-            "Searching for {:?} in {:?} of {}",
-            terms,
+        trace!(
+            self.log,
+            "GetSubsearchResultSet({:?}, {:?})",
             previous_results,
-            self.app.get_id().unwrap()
+            terms,
         );
         let candidates = previous_results
             .iter()
@@ -209,7 +216,19 @@ impl<S: ItemsSource<AppLaunchItem> + 'static> AppItemSearchProvider<S> {
             .into_iter()
             .map(String::to_owned)
             .collect();
-        debug!("Found ids {:?} for {}", ids, self.app.get_id().unwrap());
+        debug!(
+            self.log,
+            "Found ids {:?} for {}",
+            ids,
+            self.app.get_id().unwrap().as_str()
+        );
+        trace!(
+            self.log,
+            "GetSubsearchResultSet({:?}, {:?}) -> {:?}",
+            previous_results,
+            terms,
+            ids,
+        );
         ids
     }
 
@@ -228,17 +247,17 @@ impl<S: ItemsSource<AppLaunchItem> + 'static> AppItemSearchProvider<S> {
     //  - "icon-data": a tuple of type (iiibiiay) describing a pixbuf with width, height, rowstride, has-alpha, bits-per-sample, and image data
     //  - "description": an optional short description (1-2 lines)
     fn get_result_metas(&self, results: Vec<String>) -> Vec<HashMap<String, zvariant::Value>> {
-        debug!("Getting meta info for {:?}", results);
-        results
-            .into_iter()
+        trace!(self.log, "GetResultMetas({:?})", &results,);
+        let metas = results
+            .iter()
             .filter_map(|id| {
-                self.items.get(&id).map(|item| {
-                    debug!("Compiling meta info for {}", id);
+                self.items.get(id).map(|item| {
+                    debug!(self.log, "Compiling meta info for {}", id);
                     let icon = IconExt::to_string(&self.app.get_icon().unwrap()).unwrap();
-                    debug!("Using icon {} for id {}", icon, id);
+                    debug!(self.log, "Using icon {} for id {}", icon, id);
 
                     let mut meta: HashMap<String, zvariant::Value> = HashMap::new();
-                    meta.insert("id".to_string(), id.into());
+                    meta.insert("id".to_string(), id.to_string().into());
                     meta.insert("name".to_string(), item.name.to_string().into());
                     meta.insert("gicon".to_string(), icon.to_string().into());
                     meta.insert(
@@ -248,7 +267,9 @@ impl<S: ItemsSource<AppLaunchItem> + 'static> AppItemSearchProvider<S> {
                     meta
                 })
             })
-            .collect()
+            .collect();
+        trace!(self.log, "GetResultMetas({:?}) -> {:?}", &results, &metas,);
+        metas
     }
 
     /// Activate an individual result.
@@ -263,9 +284,20 @@ impl<S: ItemsSource<AppLaunchItem> + 'static> AppItemSearchProvider<S> {
         terms: Vec<String>,
         timestamp: u32,
     ) -> zbus::fdo::Result<()> {
-        debug!("Activating result {} for {:?} at {}", id, terms, timestamp);
+        trace!(
+            self.log,
+            "ActivateResult({:?}, {:?}, {:?})",
+            id,
+            terms,
+            timestamp,
+        );
         if let Some(item) = self.items.get(&id) {
-            info!("Launching recent item {:?}", item);
+            info!(
+                self.log,
+                "Launching recent item {:?} for {}",
+                item,
+                self.app.get_id().unwrap().as_str()
+            );
             match &item.target {
                 AppLaunchTarget::File(path) => self.app.launch::<gio::AppLaunchContext>(
                     &[gio::File::new_for_path(path)],
@@ -277,10 +309,11 @@ impl<S: ItemsSource<AppLaunchItem> + 'static> AppItemSearchProvider<S> {
             }
             .map_err(|error| {
                 error!(
-                    "Failed to launch app {} for target {}: {}",
-                    self.app.get_id().unwrap(),
+                    self.log,
+                    "Failed to launch app {desktop_app_id} for target {}: {}",
                     item.target.description(),
-                    error
+                    error,
+                    desktop_app_id = self.app.get_id().unwrap().as_str()
                 );
                 zbus::fdo::Error::SpawnFailed(format!(
                     "Failed to launch app {} for URI {}: {}",
@@ -290,7 +323,12 @@ impl<S: ItemsSource<AppLaunchItem> + 'static> AppItemSearchProvider<S> {
                 ))
             })
         } else {
-            error!("Item with ID {} not found", id);
+            error!(
+                self.log,
+                "Item with ID {} not found for {desktop_app_id}",
+                id,
+                desktop_app_id = self.app.get_id().unwrap().as_str()
+            );
             Err(zbus::fdo::Error::Failed(format!("Result {} not found", id)))
         }
     }
@@ -302,12 +340,17 @@ impl<S: ItemsSource<AppLaunchItem> + 'static> AppItemSearchProvider<S> {
     ///
     /// Currently it simply launches the app without any arguments.
     fn launch_search(&self, terms: Vec<String>, timestamp: u32) -> zbus::fdo::Result<()> {
-        debug!("Launching search for {:?} at {}", terms, timestamp);
-        info!("Launching app {} directly", self.app.get_id().unwrap());
+        trace!(self.log, "LaunchSearch({:?}, {:?})", terms, timestamp,);
+        info!(
+            self.log,
+            "Launching app {} directly",
+            self.app.get_id().unwrap().as_str()
+        );
         self.app
             .launch(&[], Some(&self.launch_context))
             .map_err(|error| {
                 error!(
+                    self.log,
                     "Failed to launch app {}: {:#}",
                     self.app.get_id().unwrap(),
                     error
