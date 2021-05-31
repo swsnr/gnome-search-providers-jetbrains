@@ -17,8 +17,8 @@ use std::str::FromStr;
 use anyhow::{Context, Result};
 use elementtree::Element;
 use lazy_static::lazy_static;
-use log::{debug, error, info, warn};
 use regex::Regex;
+use slog::*;
 
 use gnome_search_provider_common::app::*;
 use gnome_search_provider_common::dbus::acquire_bus_name;
@@ -26,7 +26,7 @@ use gnome_search_provider_common::export::zbus;
 use gnome_search_provider_common::log::*;
 use gnome_search_provider_common::mainloop::run_dbus_loop;
 use gnome_search_provider_common::matching::*;
-use gnome_search_provider_common::systemd::Systemd1ManagerProxy;
+use gnome_search_provider_common::systemd::Systemd1Manager;
 
 /// A path with an associated version.
 #[derive(Debug)]
@@ -277,6 +277,7 @@ const PROVIDERS: &[ProviderDefinition] = &[
 ];
 
 struct JetbrainsProjectsSource<'a> {
+    log: Logger,
     app_id: String,
     /// Where to look for the configuration and the list of recent projects.
     config: &'a ConfigLocation<'a>,
@@ -286,13 +287,33 @@ impl<'a> ItemsSource<AppLaunchItem> for JetbrainsProjectsSource<'a> {
     type Err = anyhow::Error;
 
     fn find_recent_items(&self) -> Result<IdMap<AppLaunchItem>, Self::Err> {
-        info!("Searching recent projects for {}", self.app_id);
+        info!(self.log, "Searching recent projects for {}", &self.app_id);
         let mut items = IndexMap::new();
         let config_home = dirs::config_dir().unwrap();
         if let Some(projects_file) = self.config.find_latest_recent_projects_file(&config_home) {
+            debug!(
+                self.log,
+                "Found configuration file for {} at {}",
+                &self.app_id,
+                projects_file.display()
+            );
             for path in read_recent_jetbrains_projects(File::open(projects_file)?)? {
+                trace!(
+                    self.log,
+                    "Found project directory for {} at {}",
+                    &self.app_id,
+                    &path
+                );
                 if let Some(name) = get_project_name(&path) {
                     let id = format!("jetbrains-recent-project-{}-{}", self.app_id, path);
+                    trace!(
+                        self.log,
+                        "Found project {} (id: {}) for {} at {}",
+                        &name,
+                        &id,
+                        &self.app_id,
+                        &path
+                    );
                     items.insert(
                         id,
                         AppLaunchItem {
@@ -303,7 +324,12 @@ impl<'a> ItemsSource<AppLaunchItem> for JetbrainsProjectsSource<'a> {
                 }
             }
         };
-        info!("Found {} project(s) for {}", items.len(), self.app_id,);
+        info!(
+            self.log,
+            "Found {} project(s) for {}",
+            items.len(),
+            &self.app_id
+        );
         Ok(items)
     }
 }
@@ -312,23 +338,30 @@ impl<'a> ItemsSource<AppLaunchItem> for JetbrainsProjectsSource<'a> {
 const BUSNAME: &str = "de.swsnr.searchprovider.Jetbrains";
 
 fn register_search_providers(
+    root_log: &Logger,
     connection: &zbus::Connection,
     object_server: &mut zbus::ObjectServer,
 ) -> Result<()> {
     for provider in PROVIDERS {
         if let Some(app) = gio::DesktopAppInfo::new(provider.desktop_id) {
+            let log = root_log.new(
+                o!("desktop_app_id" => provider.desktop_id, "provider_objpath" => provider.objpath()),
+            );
             info!(
+                log,
                 "Registering provider for {} at {}",
                 provider.desktop_id,
-                provider.objpath()
+                provider.objpath(),
             );
             let dbus_provider = AppItemSearchProvider::new(
+                log.clone(),
                 app,
                 JetbrainsProjectsSource {
+                    log: log.clone(),
                     app_id: provider.desktop_id.to_string(),
                     config: &provider.config,
                 },
-                Systemd1ManagerProxy::new(&connection)
+                Systemd1Manager::new(log.clone(), &connection)
                     .with_context(|| "Failed to access systemd manager via DBUS")?,
                 SystemdScopeSettings {
                     prefix: concat!("app-", env!("CARGO_BIN_NAME")).to_string(),
@@ -349,26 +382,34 @@ fn register_search_providers(
 ///
 /// Then register the connection on the Glib main loop and install a callback to
 /// handle incoming messages.
-fn start_dbus_service() -> Result<()> {
+fn start_dbus_service(root_log: &Logger) -> Result<()> {
+    let log = root_log.new(o!("busname" => BUSNAME));
+
+    info!(log, "Connecting to session bus");
     let connection =
         zbus::Connection::new_session().with_context(|| "Failed to connect to session bus")?;
 
+    debug!(log, "Creating object server");
     let mut object_server = zbus::ObjectServer::new(&connection);
 
-    register_search_providers(&connection, &mut object_server)?;
-    info!("All providers registered, acquiring {}", BUSNAME);
-    acquire_bus_name(&connection, BUSNAME)?;
-    info!("Acquired name {}, handling DBus events", BUSNAME);
+    debug!(log, "Registering all search providers on object server");
+    register_search_providers(&log, &connection, &mut object_server)?;
+    info!(log, "All providers registered, acquiring {}", BUSNAME);
+    acquire_bus_name(&log, &connection, BUSNAME)?;
+    info!(
+        log,
+        "Acquired name {}, starting service main loop to handle DBus messages", BUSNAME
+    );
 
-    run_dbus_loop(connection, move |message| {
-        match object_server.dispatch_message(&message) {
-            Ok(true) => debug!("Message dispatched to object server: {:?} ", message),
-            Ok(false) => warn!("Message not handled by object server: {:?}", message),
-            Err(error) => error!(
-                "Failed to dispatch message {:?} on object server: {}",
-                message, error
-            ),
-        }
+    run_dbus_loop(log.clone(), connection, move |message| match object_server
+        .dispatch_message(&message)
+    {
+        Ok(true) => debug!(log, "Message dispatched to object server: {:?} ", message),
+        Ok(false) => warn!(log, "Message not handled by object server: {:?}", message),
+        Err(error) => error!(
+            log,
+            "Failed to dispatch message {:?} on object server: {}", message, error
+        ),
     })
     .map_err(Into::into)
 }
@@ -398,16 +439,19 @@ Set $RUST_LOG to control the log level",
             println!("{}", label)
         }
     } else {
-        setup_logging_for_service();
+        let logger = create_service_logger(o!("version" => env!("CARGO_PKG_VERSION")));
+        slog_stdlog::init().unwrap();
+        let _guard = slog_scope::set_global_logger(logger.clone());
 
         info!(
+            logger,
             "Started {} version: {}",
             env!("CARGO_BIN_NAME"),
             env!("CARGO_PKG_VERSION")
         );
 
-        if let Err(err) = start_dbus_service() {
-            error!("Main loop error: {:#}", err);
+        if let Err(err) = start_dbus_service(&logger) {
+            error!(logger, "Main loop error: {:#}", err);
             std::process::exit(1)
         }
     }

@@ -8,6 +8,7 @@ and this project doesn't really care for versioning.
 
 ### Added
 - Automatically detect whether to log to the systemd journal.
+- Improve debug logging.
 
 ### Removed
 - Remove `--journal-log` flag. 

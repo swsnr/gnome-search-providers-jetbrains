@@ -8,6 +8,7 @@
 
 use std::fmt::Debug;
 
+use slog::{trace, Logger};
 use thiserror::Error;
 use zbus::fdo::{DBusProxy, RequestNameFlags, RequestNameReply};
 use zbus::Connection;
@@ -28,11 +29,19 @@ pub enum AcquireNameError {
 
 /// Acquire a name on the given connection.
 pub fn acquire_bus_name<S: AsRef<str>>(
+    log: &Logger,
     connection: &Connection,
     name: S,
 ) -> Result<(), AcquireNameError> {
-    let reply = DBusProxy::new(&connection)?
-        .request_name(name.as_ref(), RequestNameFlags::DoNotQueue.into())?;
+    let flags = RequestNameFlags::DoNotQueue.into();
+    let reply = DBusProxy::new(&connection)?.request_name(name.as_ref(), flags)?;
+    trace!(
+        log,
+        "RequestName({}, {:?}) -> {:?}",
+        name.as_ref(),
+        flags,
+        &reply
+    );
     if reply == RequestNameReply::PrimaryOwner {
         Ok(())
     } else {

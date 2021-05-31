@@ -21,7 +21,11 @@ lazy_static = "^1.4"
 dirs = "3.0.1"
 elementtree = "^0.5"
 anyhow = "^1.0"
-log = "^0.4"
+slog = { version = "^2.7", features = ["release_max_level_debug"] }
+slog-stdlog = "^4.1"
+slog-scope = "^4.4"
+# Only to set the maximum compiled level for the standard logging crate
+log = { version = "*", features = ["release_max_level_debug"] }
 clap = { version = "^2.33", default-features = false }
 gnome-search-provider-common = { path = "./crates/common" }
 
