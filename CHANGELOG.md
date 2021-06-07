@@ -11,6 +11,7 @@ and this project doesn't really care for versioning.
 
 ### Removed
 - Remove `--journal-log` flag. 
+- No longer require the libsystemd headers and library to build. 
 
 ## [1.5.0] – 2021-05-25
 

@@ -11,17 +11,6 @@ use log::debug;
 use zbus::dbus_proxy;
 use zbus::export::zvariant::{OwnedObjectPath, Value};
 
-/// Whether the standard error of this process is connected to the systemd journal.
-///
-/// Checks whether `$JOURNAL_STREAM` is set and non-empty.
-///
-/// See [systemd.exec][1] for more information.
-///
-/// [1]: https://www.freedesktop.org/software/systemd/man/systemd.exec.html#Environment%20Variables%20in%20Spawned%20Processes
-pub fn connected_to_journal() -> bool {
-    std::env::var_os("JOURNAL_STREAM").map_or(false, |s| !s.is_empty())
-}
-
 /// The systemd manager DBUS API.
 ///
 /// See <https://www.freedesktop.org/wiki/Software/systemd/dbus/>
@@ -86,26 +75,6 @@ pub trait Systemd1ManagerExt {
     ) -> zbus::Result<(String, OwnedObjectPath)>;
 }
 
-/// Escape a string for use in a systemd unit name.
-///
-/// See <https://www.freedesktop.org/software/systemd/man/systemd.unit.html#String%20Escaping%20for%20Inclusion%20in%20Unit%20Names>
-fn escape_name(s: &str) -> String {
-    let mut escaped = String::with_capacity(s.len() * 2);
-    for (index, b) in s.bytes().enumerate() {
-        match b {
-            b'/' => escaped.push('-'),
-            // Do not escape '.' unless it's the first character
-            b'.' if 0 < index => escaped.push(char::from(b)),
-            // Do not escaoe _ and : and
-            b'_' | b':' => escaped.push(char::from(b)),
-            // all ASCII alpha numeric characters
-            _ if b.is_ascii_alphanumeric() => escaped.push(char::from(b)),
-            _ => escaped.push_str(&format!("\\x{:02x}", b)),
-        }
-    }
-    escaped
-}
-
 impl Systemd1ManagerExt for Systemd1ManagerProxy<'_> {
     // See https://gitlab.gnome.org/jf/start-transient-unit/-/blob/117c6f32c8dc0d1f28686408f698632aa71880bc/rust/src/main.rs#L94
     // for inspiration.
@@ -145,33 +114,12 @@ impl Systemd1ManagerExt for Systemd1ManagerProxy<'_> {
         let name = format!(
             "{}-{}-{}.scope",
             properties.prefix,
-            escape_name(&properties.name),
+            libsystemd::unit::escape_name(&properties.name),
             pid
         );
         debug!("Creating new scope {} for {}", &name, pid);
         // We `fail` to start the scope if it already exists.
         self.start_transient_unit(&name, "fail", props, Vec::new())
             .map(|objpath| (name, objpath))
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use pretty_assertions::assert_eq;
-
-    #[test]
-    fn escape_name() {
-        let samples = vec![
-            // (input, escaped)
-            ("test", "test"),
-            ("a:b_c.d", "a:b_c.d"),
-            ("/foo/", "-foo-"),
-            (".foo", "\\x2efoo"),
-            ("Hallöchen, Meister", "Hall\\xc3\\xb6chen\\x2c\\x20Meister"),
-        ];
-
-        for (input, expected) in samples {
-            assert_eq!(super::escape_name(input), expected);
-        }
     }
 }

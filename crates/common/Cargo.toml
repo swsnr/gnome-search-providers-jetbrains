@@ -18,8 +18,9 @@ log = "^0.4"
 gio = "^0.9"
 glib = "^0.10"
 libc = "^0.2"
-env_logger = "^0.8"
-systemd = "^0.8"
+env_logger = { version = "^0.8", default-features = false }
+libsystemd = "^0.3"
+systemd-journal-logger = "^0.3"
 
 [dev-dependencies]
 pretty_assertions = "^0.7"
