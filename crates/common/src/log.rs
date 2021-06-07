@@ -52,6 +52,8 @@ where
             .build();
         let log = JournalLog::with_extra_fields(vec![("VERSION", version)]);
         log::set_boxed_logger(Box::new(FilteredLog { filter, log })).unwrap();
+        // When logging to systemd log panics as well, to make them appear in a structured way in logs
+        log_panics::init();
     } else {
         env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
     }
