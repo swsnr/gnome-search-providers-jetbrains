@@ -12,7 +12,7 @@ use gio::{AppInfoExt, AppLaunchContextExt, IconExt};
 use glib::VariantDict;
 use indexmap::IndexMap;
 use libc::pid_t;
-use log::{debug, error, info, warn};
+use log::{debug, error, info, trace, warn};
 use zbus::dbus_interface;
 use zbus::export::zvariant;
 
@@ -69,13 +69,20 @@ impl ScoreMatchable for AppLaunchItem {
                 .then(|| score + 10.0)
                 .ok_or(())
         });
-        let target = terms.iter().try_fold(0.0, |score, term| {
+        trace!("Score for name {} of {:?}: {:?}", &name, &self, name_score);
+        let target_score = terms.iter().try_fold(0.0, |score, term| {
             target
                 .rfind(&term.as_ref().to_lowercase())
                 .ok_or(())
                 .map(|index| score + 1.0 * (index as f64 / target.len() as f64))
         });
-        name_score.unwrap_or_default() + target.unwrap_or_default()
+        trace!(
+            "Score for target {} of {:?}: {:?}",
+            &target,
+            &self,
+            target_score
+        );
+        name_score.unwrap_or_default() + target_score.unwrap_or_default()
     }
 }
 
@@ -110,6 +117,7 @@ impl<S: ItemsSource<AppLaunchItem>> AppItemSearchProvider<S> {
     ) -> Self {
         let launch_context = gio::AppLaunchContext::new();
         launch_context.connect_launched(move |_, app, platform_data| {
+            trace!("App {} launched with data: {:?}", app.get_id().unwrap(), platform_data);
             match platform_data
                 .get::<VariantDict>()
                 .and_then(|data| data.lookup_value("pid", None))
@@ -117,7 +125,7 @@ impl<S: ItemsSource<AppLaunchItem>> AppItemSearchProvider<S> {
             {
                 None => warn!(
                     "Failed to get PID of launched application from {:?}",
-                    platform_data
+                    platform_data,
                 ),
                 Some(pid) => {
                     info!("App {} launched with PID {}", app.get_id().unwrap(), pid);
@@ -132,6 +140,7 @@ impl<S: ItemsSource<AppLaunchItem>> AppItemSearchProvider<S> {
                         description: Some(description.as_str()),
                         documentation: scope_settings.documentation.iter().map(|v| v.as_str()).collect(),
                     };
+                    trace!("start_app_scope({:?}, {})", &properties, pid);
                     match systemd.start_app_scope(properties, pid) {
                         Err(err) => error!("Failed to move running process {} of app {} into new systemd scope: {}", pid, app.get_id().unwrap(), err),
                         Ok((name, path)) => info!("Moved running process {} of app {} into new systemd scope {} at {}", pid, app.get_id().unwrap(), &name, path.into_inner()),

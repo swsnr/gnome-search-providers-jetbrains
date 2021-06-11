@@ -8,7 +8,7 @@
 
 use std::os::unix::io::AsRawFd;
 
-use log::{debug, error};
+use log::{debug, error, trace};
 use thiserror::Error;
 
 use glib::source::SourceId;
@@ -35,10 +35,18 @@ pub fn source_add_connection_local<F: FnMut(zbus::Message) + 'static>(
         connection.as_raw_fd(),
         glib::IOCondition::IN | glib::IOCondition::PRI,
         move |_, condition| {
-            debug!("Connection entered IO condition {:?}", condition);
-            match connection.receive_message() {
+            debug!(
+                "Connection {:?} entered IO condition {:?}",
+                connection, condition
+            );
+            let received = connection.receive_message();
+            trace!("{:?} receive_message() -> {:?}", &connection, &received);
+            match received {
                 Ok(message) => on_message(message),
-                Err(err) => error!("Failed to process message: {:#}", err),
+                Err(err) => error!(
+                    "Failed to process message from connection {:?}: {:#}",
+                    connection, err
+                ),
             }
             glib::Continue(true)
         },

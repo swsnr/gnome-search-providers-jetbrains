@@ -6,9 +6,10 @@
 
 //! Utilities for matching stuff.
 
-use std::fmt::Display;
+use std::fmt::{Debug, Display};
 
 pub use indexmap::IndexMap;
+use log::trace;
 
 /// Match against a list of terms and return a score.
 pub trait ScoreMatchable {
@@ -39,13 +40,21 @@ where
 /// and return a list of item IDs with non-zero score, ordered by score in descending order.
 pub fn find_matching_items<'a, I, T, K, Item>(items: I, terms: &'a [T]) -> Vec<K>
 where
+    K: Debug,
     I: Iterator<Item = (K, Item)> + 'a,
-    Item: ScoreMatchable,
-    T: AsRef<str>,
+    Item: ScoreMatchable + Debug,
+    T: AsRef<str> + Debug,
 {
     let mut matches: Vec<(f64, K)> = items
         .filter_map(move |(id, item)| {
             let score = item.match_score(terms);
+            trace!(
+                "Item {:?} (id {:?}) scored {} for terms {:?})",
+                item,
+                id,
+                score,
+                terms,
+            );
             if 0.0 < score {
                 Some((score, id))
             } else {

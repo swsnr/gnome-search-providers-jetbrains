@@ -11,17 +11,17 @@ license = "MPL-2.0"
 publish = false
 
 [dependencies]
-indexmap = "^1.6"
-zbus = "2.0.0-beta.3"
-thiserror = "^1.0"
-log = "^0.4"
+env_logger = { version = "^0.8", default-features = false }
 gio = "^0.9"
 glib = "^0.10"
+indexmap = "^1.6"
 libc = "^0.2"
-log-panics = { version = "^2.0", features = ["with-backtrace"] }
-env_logger = { version = "^0.8", default-features = false }
 libsystemd = "^0.3"
+log = "^0.4"
+log-panics = { version = "^2.0", features = ["with-backtrace"] }
 systemd-journal-logger = "^0.3"
+thiserror = "^1.0"
+zbus = "2.0.0-beta.3"
 
 [dev-dependencies]
 pretty_assertions = "^0.7"

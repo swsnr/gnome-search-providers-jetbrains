@@ -8,6 +8,8 @@
 
 use std::fmt::Debug;
 
+use log::trace;
+
 use thiserror::Error;
 use zbus::fdo::{DBusProxy, RequestNameFlags, RequestNameReply};
 use zbus::Connection;
@@ -31,8 +33,19 @@ pub fn acquire_bus_name<S: AsRef<str>>(
     connection: &Connection,
     name: S,
 ) -> Result<(), AcquireNameError> {
+    trace!(
+        "Requesting name {} on connection {:?}",
+        name.as_ref(),
+        connection
+    );
     let reply = DBusProxy::new(&connection)?
         .request_name(name.as_ref(), RequestNameFlags::DoNotQueue.into())?;
+    trace!(
+        "RequestName({}) on {:?} -> {:?}",
+        name.as_ref(),
+        connection,
+        reply,
+    );
     if reply == RequestNameReply::PrimaryOwner {
         Ok(())
     } else {

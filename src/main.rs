@@ -398,7 +398,7 @@ Set $RUST_LOG to control the log level",
             println!("{}", label)
         }
     } else {
-        setup_logging_for_service(crate_version!());
+        setup_logging_for_service(env!("CARGO_PKG_VERSION"));
 
         info!(
             "Started {} version: {}",
