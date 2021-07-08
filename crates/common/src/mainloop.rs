@@ -27,7 +27,7 @@ pub enum MainLoopError {
 ///
 /// `on_message` is not required to be `Send` but the calling thread needs to
 /// own the main context to make sure that `on_message` remains on the main thread.
-pub fn source_add_connection_local<F: FnMut(zbus::Message) + 'static>(
+pub fn source_add_connection_local<F: FnMut(&zbus::Message) + 'static>(
     log: Logger,
     connection: zbus::Connection,
     mut on_message: F,
@@ -44,7 +44,7 @@ pub fn source_add_connection_local<F: FnMut(zbus::Message) + 'static>(
                 file_descriptor = fd
             );
             match connection.receive_message() {
-                Ok(message) => on_message(message),
+                Ok(message) => on_message(&message),
                 Err(err) => error!(
                     log,
                     "Failed to process message on connection {}: {:#}", fd, err,
@@ -56,7 +56,7 @@ pub fn source_add_connection_local<F: FnMut(zbus::Message) + 'static>(
 }
 
 /// Connect to session bus, acquire the given name on the bus, and start handling messages.
-pub fn run_dbus_loop<F: FnMut(zbus::Message) + 'static>(
+pub fn run_dbus_loop<F: FnMut(&zbus::Message) + 'static>(
     log: Logger,
     connection: zbus::Connection,
     on_message: F,
