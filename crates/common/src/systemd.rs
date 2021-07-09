@@ -35,6 +35,7 @@ pub fn connected_to_journal() -> bool {
                 || fd_has_device_and_inode(std::io::stdout().as_raw_fd(), device, inode)
         })
 }
+
 /// The systemd manager DBUS API.
 ///
 /// See <https://www.freedesktop.org/wiki/Software/systemd/dbus/>
