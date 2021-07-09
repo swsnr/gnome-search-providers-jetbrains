@@ -84,26 +84,6 @@ pub struct ScopeProperties<'a> {
     pub documentation: Vec<&'a str>,
 }
 
-/// Escape a string for use in a systemd unit name.
-///
-/// See <https://www.freedesktop.org/software/systemd/man/systemd.unit.html#String%20Escaping%20for%20Inclusion%20in%20Unit%20Names>
-fn escape_name(s: &str) -> String {
-    let mut escaped = String::with_capacity(s.len() * 2);
-    for (index, b) in s.bytes().enumerate() {
-        match b {
-            b'/' => escaped.push('-'),
-            // Do not escape '.' unless it's the first character
-            b'.' if 0 < index => escaped.push(char::from(b)),
-            // Do not escaoe _ and : and
-            b'_' | b':' => escaped.push(char::from(b)),
-            // all ASCII alpha numeric characters
-            _ if b.is_ascii_alphanumeric() => escaped.push(char::from(b)),
-            _ => escaped.push_str(&format!("\\x{:02x}", b)),
-        }
-    }
-    escaped
-}
-
 /// The systemd manager on DBus.
 pub struct Systemd1Manager {
     logger: Logger,
@@ -166,7 +146,7 @@ impl Systemd1Manager {
         let name = format!(
             "{}-{}-{}.scope",
             properties.prefix,
-            escape_name(&properties.name),
+            systemd::unit::escape_name(&properties.name),
             pid
         );
         debug!(self.logger, "Creating new scope {} for {}", &name, pid);
@@ -182,26 +162,5 @@ impl Systemd1Manager {
             &result,
         );
         result.map(|objpath| (name, objpath))
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use pretty_assertions::assert_eq;
-
-    #[test]
-    fn escape_name() {
-        let samples = vec![
-            // (input, escaped)
-            ("test", "test"),
-            ("a:b_c.d", "a:b_c.d"),
-            ("/foo/", "-foo-"),
-            (".foo", "\\x2efoo"),
-            ("Hallöchen, Meister", "Hall\\xc3\\xb6chen\\x2c\\x20Meister"),
-        ];
-
-        for (input, expected) in samples {
-            assert_eq!(super::escape_name(input), expected);
-        }
     }
 }
