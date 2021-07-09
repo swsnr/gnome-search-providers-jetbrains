@@ -8,7 +8,7 @@
 
 use std::collections::HashMap;
 
-use gio::{AppInfoExt, AppLaunchContextExt, IconExt};
+use gio::prelude::*;
 use glib::VariantDict;
 use indexmap::IndexMap;
 use libc::pid_t;
@@ -123,11 +123,11 @@ impl<S: ItemsSource<AppLaunchItem>> AppItemSearchProvider<S> {
                     platform_data
                 ),
                 Some(pid) => {
-                    info!(log, "App {} launched with PID {}", app.get_id().unwrap(), pid);
+                    info!(log, "App {} launched with PID {}", app.id().unwrap(), pid);
                     // Gnome also strips the .desktop suffix from IDs, see
                     // https://gitlab.gnome.org/GNOME/gnome-desktop/-/blob/106a729c3f98b8ee56823a0a49fa8504f78dd355/libgnome-desktop/gnome-systemd.c#L227
-                    let id = app.get_id().unwrap();
-                    let description = app.get_description()
+                    let id = app.id().unwrap();
+                    let description = app.description()
                         .map_or_else(|| format!("app started by {}", scope_settings.started_by), |value| format!("{} started by {}", value, scope_settings.started_by));
                     let properties = ScopeProperties {
                         prefix: &scope_settings.prefix,
@@ -136,8 +136,8 @@ impl<S: ItemsSource<AppLaunchItem>> AppItemSearchProvider<S> {
                         documentation: scope_settings.documentation.iter().map(|v| v.as_str()).collect(),
                     };
                     match systemd.start_app_scope(properties, pid) {
-                        Err(err) => error!(log, "Failed to move running process {} of app {} into new systemd scope: {}", pid, app.get_id().unwrap(), err),
-                        Ok((name, path)) => info!(log, "Moved running process {} of app {} into new systemd scope {} at {}", pid, app.get_id().unwrap(), &name, path.into_inner()),
+                        Err(err) => error!(log, "Failed to move running process {} of app {} into new systemd scope: {}", pid, app.id().unwrap(), err),
+                        Ok((name, path)) => info!(log, "Moved running process {} of app {} into new systemd scope {} at {}", pid, app.id().unwrap(), &name, path.into_inner()),
                     }
                 }
             }
@@ -168,12 +168,12 @@ impl<S: ItemsSource<AppLaunchItem> + 'static> AppItemSearchProvider<S> {
             error!(
                 self.log,
                 "Failed to update recent items for {}: {:#}",
-                self.app.get_id().unwrap().as_str(),
+                self.app.id().unwrap().as_str(),
                 error,
             );
             zbus::fdo::Error::Failed(format!(
                 "Failed to update recent items for {}: {:#}",
-                self.app.get_id().unwrap(),
+                self.app.id().unwrap(),
                 error
             ))
         })?;
@@ -186,7 +186,7 @@ impl<S: ItemsSource<AppLaunchItem> + 'static> AppItemSearchProvider<S> {
             self.log,
             "Found ids {:?} for {}",
             ids,
-            self.app.get_id().unwrap().as_str(),
+            self.app.id().unwrap().as_str(),
         );
         trace!(self.log, "GetInitialResultSet({:?}) -> {:?}", terms, ids,);
         Ok(ids)
@@ -220,7 +220,7 @@ impl<S: ItemsSource<AppLaunchItem> + 'static> AppItemSearchProvider<S> {
             self.log,
             "Found ids {:?} for {}",
             ids,
-            self.app.get_id().unwrap().as_str()
+            self.app.id().unwrap().as_str()
         );
         trace!(
             self.log,
@@ -253,7 +253,7 @@ impl<S: ItemsSource<AppLaunchItem> + 'static> AppItemSearchProvider<S> {
             .filter_map(|id| {
                 self.items.get(id).map(|item| {
                     debug!(self.log, "Compiling meta info for {}", id);
-                    let icon = IconExt::to_string(&self.app.get_icon().unwrap()).unwrap();
+                    let icon = IconExt::to_string(&self.app.icon().unwrap()).unwrap();
                     debug!(self.log, "Using icon {} for id {}", icon, id);
 
                     let mut meta: HashMap<String, zvariant::Value> = HashMap::new();
@@ -296,11 +296,11 @@ impl<S: ItemsSource<AppLaunchItem> + 'static> AppItemSearchProvider<S> {
                 self.log,
                 "Launching recent item {:?} for {}",
                 item,
-                self.app.get_id().unwrap().as_str()
+                self.app.id().unwrap().as_str()
             );
             match &item.target {
                 AppLaunchTarget::File(path) => self.app.launch::<gio::AppLaunchContext>(
-                    &[gio::File::new_for_path(path)],
+                    &[gio::File::for_path(path)],
                     Some(&self.launch_context),
                 ),
                 AppLaunchTarget::Uri(uri) => {
@@ -313,11 +313,11 @@ impl<S: ItemsSource<AppLaunchItem> + 'static> AppItemSearchProvider<S> {
                     "Failed to launch app {desktop_app_id} for target {}: {}",
                     item.target.description(),
                     error,
-                    desktop_app_id = self.app.get_id().unwrap().as_str()
+                    desktop_app_id = self.app.id().unwrap().as_str()
                 );
                 zbus::fdo::Error::SpawnFailed(format!(
                     "Failed to launch app {} for URI {}: {}",
-                    self.app.get_id().unwrap(),
+                    self.app.id().unwrap(),
                     item.target.description(),
                     error
                 ))
@@ -327,7 +327,7 @@ impl<S: ItemsSource<AppLaunchItem> + 'static> AppItemSearchProvider<S> {
                 self.log,
                 "Item with ID {} not found for {desktop_app_id}",
                 id,
-                desktop_app_id = self.app.get_id().unwrap().as_str()
+                desktop_app_id = self.app.id().unwrap().as_str()
             );
             Err(zbus::fdo::Error::Failed(format!("Result {} not found", id)))
         }
@@ -344,7 +344,7 @@ impl<S: ItemsSource<AppLaunchItem> + 'static> AppItemSearchProvider<S> {
         info!(
             self.log,
             "Launching app {} directly",
-            self.app.get_id().unwrap().as_str()
+            self.app.id().unwrap().as_str()
         );
         self.app
             .launch(&[], Some(&self.launch_context))
@@ -352,12 +352,12 @@ impl<S: ItemsSource<AppLaunchItem> + 'static> AppItemSearchProvider<S> {
                 error!(
                     self.log,
                     "Failed to launch app {}: {:#}",
-                    self.app.get_id().unwrap(),
+                    self.app.id().unwrap(),
                     error
                 );
                 zbus::fdo::Error::SpawnFailed(format!(
                     "Failed to launch app {}: {}",
-                    self.app.get_id().unwrap(),
+                    self.app.id().unwrap(),
                     error
                 ))
             })
