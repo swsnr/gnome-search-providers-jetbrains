@@ -10,6 +10,7 @@ use std::fmt::Debug;
 
 use slog::{trace, Logger};
 use thiserror::Error;
+use zbus::export::names::WellKnownName;
 use zbus::fdo::{DBusProxy, RequestNameFlags, RequestNameReply};
 use zbus::Connection;
 
@@ -28,25 +29,19 @@ pub enum AcquireNameError {
 }
 
 /// Acquire a name on the given connection.
-pub fn acquire_bus_name<S: AsRef<str>>(
+pub fn acquire_bus_name(
     log: &Logger,
     connection: &Connection,
-    name: S,
+    name: WellKnownName,
 ) -> Result<(), AcquireNameError> {
     let flags = RequestNameFlags::DoNotQueue.into();
-    let reply = DBusProxy::new(&connection)?.request_name(name.as_ref(), flags)?;
-    trace!(
-        log,
-        "RequestName({}, {:?}) -> {:?}",
-        name.as_ref(),
-        flags,
-        &reply
-    );
+    let reply = DBusProxy::new(&connection)?.request_name(name.clone(), flags)?;
+    trace!(log, "RequestName({}, {:?}) -> {:?}", name, flags, &reply);
     if reply == RequestNameReply::PrimaryOwner {
         Ok(())
     } else {
         Err(AcquireNameError::RequestNameRejected(
-            name.as_ref().to_string(),
+            name.to_string(),
             reply,
         ))
     }

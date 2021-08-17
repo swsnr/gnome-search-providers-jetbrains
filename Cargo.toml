@@ -16,9 +16,9 @@ publish = false
 [dependencies]
 gio = "^0.14"
 globwalk = "^0.8"
-regex = "^1.4"
+regex = "^1.5"
 lazy_static = "^1.4"
-dirs = "3.0.1"
+dirs = "^3.0"
 elementtree = "^0.5"
 anyhow = "^1.0"
 slog = { version = "^2.7", features = ["release_max_level_debug"] }

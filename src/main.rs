@@ -19,10 +19,12 @@ use elementtree::Element;
 use lazy_static::lazy_static;
 use regex::Regex;
 use slog::*;
+use std::convert::TryFrom;
 
 use gnome_search_provider_common::app::*;
 use gnome_search_provider_common::dbus::acquire_bus_name;
 use gnome_search_provider_common::export::zbus;
+use gnome_search_provider_common::export::zbus::export::names::WellKnownName;
 use gnome_search_provider_common::log::*;
 use gnome_search_provider_common::mainloop::run_dbus_loop;
 use gnome_search_provider_common::matching::*;
@@ -387,7 +389,7 @@ fn start_dbus_service(root_log: &Logger) -> Result<()> {
 
     info!(log, "Connecting to session bus");
     let connection =
-        zbus::Connection::new_session().with_context(|| "Failed to connect to session bus")?;
+        zbus::Connection::session().with_context(|| "Failed to connect to session bus")?;
 
     debug!(log, "Creating object server");
     let mut object_server = zbus::ObjectServer::new(&connection);
@@ -395,7 +397,7 @@ fn start_dbus_service(root_log: &Logger) -> Result<()> {
     debug!(log, "Registering all search providers on object server");
     register_search_providers(&log, &connection, &mut object_server)?;
     info!(log, "All providers registered, acquiring {}", BUSNAME);
-    acquire_bus_name(&log, &connection, BUSNAME)?;
+    acquire_bus_name(&log, &connection, WellKnownName::try_from(BUSNAME).unwrap())?;
     info!(
         log,
         "Acquired name {}, starting service main loop to handle DBus messages", BUSNAME
