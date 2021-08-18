@@ -146,7 +146,7 @@ impl Systemd1Manager {
         let name = format!(
             "{}-{}-{}.scope",
             properties.prefix,
-            systemd::unit::escape_name(&properties.name),
+            systemd::unit::escape_name(properties.name),
             pid
         );
         debug!(self.logger, "Creating new scope {} for {}", &name, pid);

@@ -35,7 +35,7 @@ pub fn acquire_bus_name(
     name: WellKnownName,
 ) -> Result<(), AcquireNameError> {
     let flags = RequestNameFlags::DoNotQueue.into();
-    let reply = DBusProxy::new(&connection)?.request_name(name.clone(), flags)?;
+    let reply = DBusProxy::new(connection)?.request_name(name.clone(), flags)?;
     trace!(log, "RequestName({}, {:?}) -> {:?}", name, flags, &reply);
     if reply == RequestNameReply::PrimaryOwner {
         Ok(())

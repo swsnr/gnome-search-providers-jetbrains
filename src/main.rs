@@ -363,7 +363,7 @@ fn register_search_providers(
                     app_id: provider.desktop_id.to_string(),
                     config: &provider.config,
                 },
-                Systemd1Manager::new(log.clone(), &connection)
+                Systemd1Manager::new(log.clone(), connection)
                     .with_context(|| "Failed to access systemd manager via DBUS")?,
                 SystemdScopeSettings {
                     prefix: concat!("app-", env!("CARGO_BIN_NAME")).to_string(),
@@ -404,7 +404,7 @@ fn start_dbus_service(root_log: &Logger) -> Result<()> {
     );
 
     run_dbus_loop(log.clone(), connection, move |message| match object_server
-        .dispatch_message(&message)
+        .dispatch_message(message)
     {
         Ok(true) => debug!(log, "Message dispatched to object server: {:?} ", message),
         Ok(false) => warn!(log, "Message not handled by object server: {:?}", message),
