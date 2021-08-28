@@ -11,7 +11,7 @@ and this project doesn't really care for versioning.
 - Improve debug logging.
 
 ### Removed
-- Remove `--journal-log` flag. 
+- Remove `--journal-log` flag.
 
 ## [1.5.0] – 2021-05-25
 
