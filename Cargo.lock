@@ -615,7 +615,6 @@ name = "gnome-search-provider-common"
 version = "0.1.0"
 dependencies = [
  "gio",
- "glib",
  "indexmap",
  "libc",
  "nix 0.22.1",

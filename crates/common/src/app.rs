@@ -8,6 +8,7 @@
 
 use std::collections::HashMap;
 
+use gio::glib;
 use gio::prelude::*;
 use glib::VariantDict;
 use indexmap::IndexMap;

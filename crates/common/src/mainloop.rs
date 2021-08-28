@@ -11,6 +11,7 @@ use std::os::unix::io::AsRawFd;
 use slog::{debug, error, o, Logger};
 use thiserror::Error;
 
+use gio::glib;
 use glib::source::SourceId;
 
 /// An error occurred while starting the main loop.
