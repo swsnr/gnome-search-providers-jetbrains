@@ -13,6 +13,8 @@ use thiserror::Error;
 
 use gio::glib;
 use glib::source::SourceId;
+use slog::warn;
+use zbus::ObjectServer;
 
 /// An error occurred while starting the main loop.
 #[derive(Error, Debug)]
@@ -56,7 +58,7 @@ pub fn source_add_connection_local<F: FnMut(&zbus::Message) + 'static>(
     )
 }
 
-/// Connect to session bus, acquire the given name on the bus, and start handling messages.
+/// Handle messages received on the given `connection` with `on_message`.
 pub fn run_dbus_loop<F: FnMut(&zbus::Message) + 'static>(
     log: Logger,
     connection: zbus::Connection,
@@ -92,4 +94,22 @@ pub fn run_dbus_loop<F: FnMut(&zbus::Message) + 'static>(
     // We no longer require the main context.
     drop(guard);
     Ok(())
+}
+
+/// Dispatch messages received on the given `connection` to the given `object_server`.
+pub fn run_object_server_loop(
+    log: Logger,
+    connection: zbus::Connection,
+    mut object_server: ObjectServer,
+) -> Result<(), MainLoopError> {
+    run_dbus_loop(log.clone(), connection, move |message| match object_server
+        .dispatch_message(message)
+    {
+        Ok(true) => debug!(log, "Message dispatched to object server: {:?} ", message),
+        Ok(false) => warn!(log, "Message not handled by object server: {:?}", message),
+        Err(error) => error!(
+            log,
+            "Failed to dispatch message {:?} on object server: {}", message, error
+        ),
+    })
 }

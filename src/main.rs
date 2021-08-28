@@ -19,14 +19,11 @@ use elementtree::Element;
 use lazy_static::lazy_static;
 use regex::Regex;
 use slog::*;
-use std::convert::TryFrom;
 
 use gnome_search_provider_common::app::*;
-use gnome_search_provider_common::dbus::acquire_bus_name;
 use gnome_search_provider_common::export::zbus;
-use gnome_search_provider_common::export::zbus::export::names::WellKnownName;
 use gnome_search_provider_common::log::*;
-use gnome_search_provider_common::mainloop::run_dbus_loop;
+use gnome_search_provider_common::mainloop::run_object_server_loop;
 use gnome_search_provider_common::matching::*;
 use gnome_search_provider_common::systemd::Systemd1Manager;
 
@@ -396,23 +393,15 @@ fn start_dbus_service(root_log: &Logger) -> Result<()> {
 
     debug!(log, "Registering all search providers on object server");
     register_search_providers(&log, &connection, &mut object_server)?;
-    info!(log, "All providers registered, acquiring {}", BUSNAME);
-    acquire_bus_name(&log, &connection, WellKnownName::try_from(BUSNAME).unwrap())?;
     info!(
         log,
-        "Acquired name {}, starting service main loop to handle DBus messages", BUSNAME
+        "All providers registered, acquiring {} and starting loop to handle DBus messages", BUSNAME
     );
-
-    run_dbus_loop(log.clone(), connection, move |message| match object_server
-        .dispatch_message(message)
-    {
-        Ok(true) => debug!(log, "Message dispatched to object server: {:?} ", message),
-        Ok(false) => warn!(log, "Message not handled by object server: {:?}", message),
-        Err(error) => error!(
-            log,
-            "Failed to dispatch message {:?} on object server: {}", message, error
-        ),
-    })
+    run_object_server_loop(
+        log.clone(),
+        connection,
+        object_server.request_name(BUSNAME)?,
+    )
     .map_err(Into::into)
 }
 
