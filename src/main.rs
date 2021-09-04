@@ -395,7 +395,7 @@ fn start_dbus_service() -> Result<()> {
 
     run_dbus_loop(connection, move |message| {
         match object_server.dispatch_message(&message) {
-            Ok(true) => debug!("Message dispatched to object server: {:?} ", message),
+            Ok(true) => trace!("Message dispatched to object server: {:?} ", message),
             Ok(false) => warn!("Message not handled by object server: {:?}", message),
             Err(error) => error!(
                 "Failed to dispatch message {:?} on object server: {}",
