@@ -17,6 +17,7 @@ pub mod systemd;
 
 /// Re-exports.
 pub mod export {
+    pub use futures_util;
     pub use gio;
     pub use zbus;
 }
