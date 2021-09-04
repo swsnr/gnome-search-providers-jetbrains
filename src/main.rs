@@ -28,7 +28,6 @@ use gnome_search_provider_common::export::zbus;
 use gnome_search_provider_common::log::*;
 use gnome_search_provider_common::mainloop::*;
 use gnome_search_provider_common::matching::*;
-use gnome_search_provider_common::systemd::Systemd1ManagerProxy;
 
 /// A path with an associated version.
 #[derive(Debug)]
@@ -349,6 +348,14 @@ fn register_search_providers(
     connection: &zbus::Connection,
     object_server: &mut zbus::ObjectServer,
 ) -> Result<()> {
+    let launch_context = create_launch_context(
+        connection.clone(),
+        SystemdScopeSettings {
+            prefix: concat!("app-", env!("CARGO_BIN_NAME")).to_string(),
+            started_by: env!("CARGO_BIN_NAME").to_string(),
+            documentation: vec![env!("CARGO_PKG_HOMEPAGE").to_string()],
+        },
+    );
     for provider in PROVIDERS {
         if let Some(app) = gio::DesktopAppInfo::new(provider.desktop_id) {
             info!(
@@ -362,13 +369,7 @@ fn register_search_providers(
                     app_id: provider.desktop_id.to_string(),
                     config: &provider.config,
                 },
-                Systemd1ManagerProxy::new(connection)
-                    .with_context(|| "Failed to access systemd manager via DBUS")?,
-                SystemdScopeSettings {
-                    prefix: concat!("app-", env!("CARGO_BIN_NAME")).to_string(),
-                    started_by: env!("CARGO_BIN_NAME").to_string(),
-                    documentation: vec![env!("CARGO_PKG_HOMEPAGE").to_string()],
-                },
+                launch_context.clone(),
             );
             object_server.at(provider.objpath().as_str(), dbus_provider)?;
         }
