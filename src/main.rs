@@ -17,7 +17,7 @@ use std::str::FromStr;
 use anyhow::{Context, Result};
 use elementtree::Element;
 use lazy_static::lazy_static;
-use log::{debug, error, info, warn};
+use log::{debug, error, info, trace, warn};
 use regex::Regex;
 
 use gnome_search_provider_common::app::*;
@@ -47,6 +47,8 @@ fn read_recent_jetbrains_projects<R: Read>(reader: R) -> Result<Vec<String>> {
         .ok()
         .with_context(|| "$HOME not a valid UTF-8 string")?;
 
+    trace!("Finding projects in {:?}", element);
+
     let projects = element
         .find_all("component")
         .find(|e| {
@@ -66,6 +68,8 @@ fn read_recent_jetbrains_projects<R: Read>(reader: R) -> Result<Vec<String>> {
         })
         .unwrap_or_default();
 
+    trace!("Parsed projects {:?} from {:?}", projects, element);
+
     Ok(projects)
 }
 
@@ -78,11 +82,20 @@ impl VersionedPath {
             static ref RE: Regex = Regex::new(r"(\d{1,4}).(\d{1,2})").unwrap();
         }
 
+        trace!("Parsing {} with {}", path.display(), RE.as_str());
+
         let version = path
             .file_name()
             .and_then(OsStr::to_str)
             .and_then(|filename| RE.captures(filename))
             .map(|m| (u16::from_str(&m[1]).unwrap(), u16::from_str(&m[2]).unwrap()));
+
+        trace!(
+            "Parsing {} with {} -> {:?}",
+            path.display(),
+            RE.as_str(),
+            version
+        );
 
         version.map(|version| VersionedPath { path, version })
     }
@@ -108,21 +121,30 @@ impl ConfigLocation<'_> {
     /// Find the configuration directory of the latest installed product version.
     fn find_config_dir_of_latest_version(&self, config_home: &Path) -> Option<VersionedPath> {
         let vendor_dir = config_home.join(self.vendor_dir);
-        globwalk::GlobWalkerBuilder::new(vendor_dir, self.config_glob)
+        let dir = globwalk::GlobWalkerBuilder::new(vendor_dir, self.config_glob)
             .build()
             .expect("Failed to build glob pattern")
             .filter_map(Result::ok)
             .map(globwalk::DirEntry::into_path)
             .filter_map(VersionedPath::extract_version)
-            .max_by_key(|p| p.version)
+            .max_by_key(|p| p.version);
+        debug!("Found config dir {:?} in {}", dir, config_home.display());
+        dir
     }
 
     /// Find the latest recent projects file.
     fn find_latest_recent_projects_file(&self, config_home: &Path) -> Option<PathBuf> {
-        self.find_config_dir_of_latest_version(config_home)
+        let file = self
+            .find_config_dir_of_latest_version(config_home)
             .map(|p| p.into_path())
             .map(|p| p.join("options").join(self.projects_filename))
-            .filter(|p| p.is_file())
+            .filter(|p| p.is_file());
+        debug!(
+            "Found recent projects file {:?} in {}",
+            file,
+            config_home.display()
+        );
+        file
     }
 }
 
@@ -132,14 +154,21 @@ impl ConfigLocation<'_> {
 /// or cannot be read take the file name of `path`, and ultimately return `None` if
 /// the name cannot be determined.
 fn get_project_name<P: AsRef<Path>>(path: P) -> Option<String> {
-    File::open(path.as_ref().join(".idea").join(".name"))
+    let name_file = path.as_ref().join(".idea").join(".name");
+    trace!("Trying to read name from {}", name_file.display());
+    File::open(&name_file)
         .and_then(|mut source| {
             let mut buffer = String::new();
             source.read_to_string(&mut buffer)?;
+            trace!("Read project name {} from {}", buffer, name_file.display());
             Ok(buffer)
         })
         .ok()
         .or_else(|| {
+            trace!(
+                "Falling back to file name of {} as project name",
+                path.as_ref().display()
+            );
             path.as_ref()
                 .file_name()
                 .map(|name| name.to_string_lossy().to_string())
@@ -293,6 +322,7 @@ impl<'a> ItemsSource<AppLaunchItem> for JetbrainsProjectsSource<'a> {
         if let Some(projects_file) = self.config.find_latest_recent_projects_file(&config_home) {
             for path in read_recent_jetbrains_projects(File::open(projects_file)?)? {
                 if let Some(name) = get_project_name(&path) {
+                    trace!("Found project {} at {} for {}", name, path, self.app_id);
                     let id = format!("jetbrains-recent-project-{}-{}", self.app_id, path);
                     items.insert(
                         id,
@@ -301,6 +331,8 @@ impl<'a> ItemsSource<AppLaunchItem> for JetbrainsProjectsSource<'a> {
                             target: AppLaunchTarget::File(path),
                         },
                     );
+                } else {
+                    trace!("Skipping {}, failed to determine project name", path);
                 }
             }
         };

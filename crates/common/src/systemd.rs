@@ -8,7 +8,7 @@
 
 use libc::pid_t;
 use libsystemd::unit::escape_name;
-use log::debug;
+use log::{debug, trace};
 use zbus::dbus_proxy;
 use zbus::export::zvariant::{OwnedObjectPath, Value};
 
@@ -31,8 +31,8 @@ pub trait Systemd1Manager {
         &self,
         name: &str,
         mode: &str,
-        properties: Vec<(&str, Value<'_>)>,
-        aux: Vec<(&str, Vec<(&str, Value<'_>)>)>,
+        properties: &[(&str, Value<'_>)],
+        aux: &[(&str, Vec<(&str, Value<'_>)>)],
     ) -> zbus::Result<OwnedObjectPath>;
 }
 
@@ -119,8 +119,25 @@ impl Systemd1ManagerExt for Systemd1ManagerProxy<'_> {
             pid
         );
         debug!("Creating new scope {} for {}", &name, pid);
+
         // We `fail` to start the scope if it already exists.
-        self.start_transient_unit(&name, "fail", props, Vec::new())
-            .map(|objpath| (name, objpath))
+        let mode = "fail";
+        let aux = &[];
+        trace!(
+            "StartTransientUnit({}, {}, {:?}, {:?})",
+            name,
+            mode,
+            props,
+            aux
+        );
+        let result = self.start_transient_unit(&name, mode, &props, aux);
+        trace!(
+            "StartTransientUnit({}, {}, {:?}, []) -> {:?}",
+            name,
+            mode,
+            props,
+            result
+        );
+        result.map(|objpath| (name, objpath))
     }
 }

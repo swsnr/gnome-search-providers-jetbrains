@@ -6,7 +6,9 @@
 
 //! Utilities for matching stuff.
 
-use std::fmt::Display;
+use std::fmt::{Debug, Display};
+
+use log::trace;
 
 pub use indexmap::IndexMap;
 
@@ -42,6 +44,7 @@ where
     I: Iterator<Item = (K, Item)> + 'a,
     Item: ScoreMatchable,
     T: AsRef<str>,
+    K: Debug,
 {
     let mut matches: Vec<(f64, K)> = items
         .filter_map(move |(id, item)| {
@@ -55,6 +58,11 @@ where
         .collect();
     // Sort by score, descending
     matches.sort_by(|(score_a, _), (score_b, _)| score_b.partial_cmp(score_a).unwrap());
+    trace!(
+        "Matches {:?} for terms {:?}",
+        matches,
+        terms.iter().map(|s| s.as_ref()).collect::<Vec<&str>>()
+    );
     matches.into_iter().map(move |(_, id)| id).collect()
 }
 

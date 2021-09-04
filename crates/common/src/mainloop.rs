@@ -8,7 +8,7 @@
 
 use std::os::unix::io::AsRawFd;
 
-use log::{debug, error};
+use log::{debug, error, trace};
 use thiserror::Error;
 
 use gio::glib;
@@ -32,18 +32,20 @@ pub fn source_add_connection_local<F: FnMut(zbus::Message) + 'static>(
     connection: zbus::Connection,
     mut on_message: F,
 ) -> SourceId {
-    glib::source::unix_fd_add_local(
+    let conditions = glib::IOCondition::IN | glib::IOCondition::PRI;
+    debug!(
+        "Watching connection fd {} for conditions {:?}",
         connection.as_raw_fd(),
-        glib::IOCondition::IN | glib::IOCondition::PRI,
-        move |_, condition| {
-            debug!("Connection entered IO condition {:?}", condition);
-            match connection.receive_message() {
-                Ok(message) => on_message(message),
-                Err(err) => error!("Failed to process message: {:#}", err),
-            }
-            glib::Continue(true)
-        },
-    )
+        conditions
+    );
+    glib::source::unix_fd_add_local(connection.as_raw_fd(), conditions, move |_, condition| {
+        trace!("Connection entered IO condition {:?}", condition);
+        match connection.receive_message() {
+            Ok(message) => on_message(message),
+            Err(err) => error!("Failed to process message: {:#}", err),
+        }
+        glib::Continue(true)
+    })
 }
 
 /// Connect to session bus, acquire the given name on the bus, and start handling messages.
@@ -51,6 +53,7 @@ pub fn run_dbus_loop<F: FnMut(zbus::Message) + 'static>(
     connection: zbus::Connection,
     on_message: F,
 ) -> Result<(), MainLoopError> {
+    trace!("Acquire main context");
     let context = glib::MainContext::default();
     let guard = context
         .acquire()
@@ -59,6 +62,7 @@ pub fn run_dbus_loop<F: FnMut(zbus::Message) + 'static>(
 
     source_add_connection_local(connection, on_message);
 
+    trace!("Listening for SIGTERM");
     glib::source::unix_signal_add(
         libc::SIGTERM,
         glib::clone!(@strong mainloop =>  move || {
@@ -68,6 +72,7 @@ pub fn run_dbus_loop<F: FnMut(zbus::Message) + 'static>(
         }),
     );
 
+    trace!("Listening for SIGINT");
     glib::source::unix_signal_add(
         libc::SIGINT,
         glib::clone!(@strong mainloop =>  move || {
@@ -77,6 +82,7 @@ pub fn run_dbus_loop<F: FnMut(zbus::Message) + 'static>(
         }),
     );
 
+    trace!("mainloop run");
     mainloop.run();
     // We no longer require the main context.
     drop(guard);
