@@ -17,15 +17,17 @@ use std::str::FromStr;
 use anyhow::{Context, Result};
 use elementtree::Element;
 use lazy_static::lazy_static;
+use log::{debug, error, info, trace, warn};
 use regex::Regex;
-use slog::*;
 
 use gnome_search_provider_common::app::*;
+use gnome_search_provider_common::dbus::acquire_bus_name;
+use gnome_search_provider_common::export::gio;
 use gnome_search_provider_common::export::zbus;
 use gnome_search_provider_common::log::*;
-use gnome_search_provider_common::mainloop::run_object_server_loop;
+use gnome_search_provider_common::mainloop::run_dbus_loop;
 use gnome_search_provider_common::matching::*;
-use gnome_search_provider_common::systemd::Systemd1Manager;
+use gnome_search_provider_common::systemd::Systemd1ManagerProxy;
 
 /// A path with an associated version.
 #[derive(Debug)]
@@ -44,6 +46,8 @@ fn read_recent_jetbrains_projects<R: Read>(reader: R) -> Result<Vec<String>> {
         .into_string()
         .ok()
         .with_context(|| "$HOME not a valid UTF-8 string")?;
+
+    trace!("Finding projects in {:?}", element);
 
     let projects = element
         .find_all("component")
@@ -64,6 +68,8 @@ fn read_recent_jetbrains_projects<R: Read>(reader: R) -> Result<Vec<String>> {
         })
         .unwrap_or_default();
 
+    trace!("Parsed projects {:?} from {:?}", projects, element);
+
     Ok(projects)
 }
 
@@ -76,11 +82,20 @@ impl VersionedPath {
             static ref RE: Regex = Regex::new(r"(\d{1,4}).(\d{1,2})").unwrap();
         }
 
+        trace!("Parsing {} with {}", path.display(), RE.as_str());
+
         let version = path
             .file_name()
             .and_then(OsStr::to_str)
             .and_then(|filename| RE.captures(filename))
             .map(|m| (u16::from_str(&m[1]).unwrap(), u16::from_str(&m[2]).unwrap()));
+
+        trace!(
+            "Parsing {} with {} -> {:?}",
+            path.display(),
+            RE.as_str(),
+            version
+        );
 
         version.map(|version| VersionedPath { path, version })
     }
@@ -106,21 +121,30 @@ impl ConfigLocation<'_> {
     /// Find the configuration directory of the latest installed product version.
     fn find_config_dir_of_latest_version(&self, config_home: &Path) -> Option<VersionedPath> {
         let vendor_dir = config_home.join(self.vendor_dir);
-        globwalk::GlobWalkerBuilder::new(vendor_dir, self.config_glob)
+        let dir = globwalk::GlobWalkerBuilder::new(vendor_dir, self.config_glob)
             .build()
             .expect("Failed to build glob pattern")
             .filter_map(Result::ok)
             .map(globwalk::DirEntry::into_path)
             .filter_map(VersionedPath::extract_version)
-            .max_by_key(|p| p.version)
+            .max_by_key(|p| p.version);
+        debug!("Found config dir {:?} in {}", dir, config_home.display());
+        dir
     }
 
     /// Find the latest recent projects file.
     fn find_latest_recent_projects_file(&self, config_home: &Path) -> Option<PathBuf> {
-        self.find_config_dir_of_latest_version(config_home)
+        let file = self
+            .find_config_dir_of_latest_version(config_home)
             .map(|p| p.into_path())
             .map(|p| p.join("options").join(self.projects_filename))
-            .filter(|p| p.is_file())
+            .filter(|p| p.is_file());
+        debug!(
+            "Found recent projects file {:?} in {}",
+            file,
+            config_home.display()
+        );
+        file
     }
 }
 
@@ -130,14 +154,21 @@ impl ConfigLocation<'_> {
 /// or cannot be read take the file name of `path`, and ultimately return `None` if
 /// the name cannot be determined.
 fn get_project_name<P: AsRef<Path>>(path: P) -> Option<String> {
-    File::open(path.as_ref().join(".idea").join(".name"))
+    let name_file = path.as_ref().join(".idea").join(".name");
+    trace!("Trying to read name from {}", name_file.display());
+    File::open(&name_file)
         .and_then(|mut source| {
             let mut buffer = String::new();
             source.read_to_string(&mut buffer)?;
+            trace!("Read project name {} from {}", buffer, name_file.display());
             Ok(buffer)
         })
         .ok()
         .or_else(|| {
+            trace!(
+                "Falling back to file name of {} as project name",
+                path.as_ref().display()
+            );
             path.as_ref()
                 .file_name()
                 .map(|name| name.to_string_lossy().to_string())
@@ -276,7 +307,6 @@ const PROVIDERS: &[ProviderDefinition] = &[
 ];
 
 struct JetbrainsProjectsSource<'a> {
-    log: Logger,
     app_id: String,
     /// Where to look for the configuration and the list of recent projects.
     config: &'a ConfigLocation<'a>,
@@ -286,33 +316,14 @@ impl<'a> ItemsSource<AppLaunchItem> for JetbrainsProjectsSource<'a> {
     type Err = anyhow::Error;
 
     fn find_recent_items(&self) -> Result<IdMap<AppLaunchItem>, Self::Err> {
-        info!(self.log, "Searching recent projects for {}", &self.app_id);
+        info!("Searching recent projects for {}", self.app_id);
         let mut items = IndexMap::new();
         let config_home = dirs::config_dir().unwrap();
         if let Some(projects_file) = self.config.find_latest_recent_projects_file(&config_home) {
-            debug!(
-                self.log,
-                "Found configuration file for {} at {}",
-                &self.app_id,
-                projects_file.display()
-            );
             for path in read_recent_jetbrains_projects(File::open(projects_file)?)? {
-                trace!(
-                    self.log,
-                    "Found project directory for {} at {}",
-                    &self.app_id,
-                    &path
-                );
                 if let Some(name) = get_project_name(&path) {
+                    trace!("Found project {} at {} for {}", name, path, self.app_id);
                     let id = format!("jetbrains-recent-project-{}-{}", self.app_id, path);
-                    trace!(
-                        self.log,
-                        "Found project {} (id: {}) for {} at {}",
-                        &name,
-                        &id,
-                        &self.app_id,
-                        &path
-                    );
                     items.insert(
                         id,
                         AppLaunchItem {
@@ -320,15 +331,12 @@ impl<'a> ItemsSource<AppLaunchItem> for JetbrainsProjectsSource<'a> {
                             target: AppLaunchTarget::File(path),
                         },
                     );
+                } else {
+                    trace!("Skipping {}, failed to determine project name", path);
                 }
             }
         };
-        info!(
-            self.log,
-            "Found {} project(s) for {}",
-            items.len(),
-            &self.app_id
-        );
+        info!("Found {} project(s) for {}", items.len(), self.app_id,);
         Ok(items)
     }
 }
@@ -337,30 +345,23 @@ impl<'a> ItemsSource<AppLaunchItem> for JetbrainsProjectsSource<'a> {
 const BUSNAME: &str = "de.swsnr.searchprovider.Jetbrains";
 
 fn register_search_providers(
-    root_log: &Logger,
     connection: &zbus::Connection,
     object_server: &mut zbus::ObjectServer,
 ) -> Result<()> {
     for provider in PROVIDERS {
         if let Some(app) = gio::DesktopAppInfo::new(provider.desktop_id) {
-            let log = root_log.new(
-                o!("desktop_app_id" => provider.desktop_id, "provider_objpath" => provider.objpath()),
-            );
             info!(
-                log,
                 "Registering provider for {} at {}",
                 provider.desktop_id,
-                provider.objpath(),
+                provider.objpath()
             );
             let dbus_provider = AppItemSearchProvider::new(
-                log.clone(),
                 app,
                 JetbrainsProjectsSource {
-                    log: log.clone(),
                     app_id: provider.desktop_id.to_string(),
                     config: &provider.config,
                 },
-                Systemd1Manager::new(log.clone(), connection)
+                Systemd1ManagerProxy::new(connection)
                     .with_context(|| "Failed to access systemd manager via DBUS")?,
                 SystemdScopeSettings {
                     prefix: concat!("app-", env!("CARGO_BIN_NAME")).to_string(),
@@ -381,27 +382,27 @@ fn register_search_providers(
 ///
 /// Then register the connection on the Glib main loop and install a callback to
 /// handle incoming messages.
-fn start_dbus_service(root_log: &Logger) -> Result<()> {
-    let log = root_log.new(o!("busname" => BUSNAME));
-
-    info!(log, "Connecting to session bus");
+fn start_dbus_service() -> Result<()> {
     let connection =
-        zbus::Connection::session().with_context(|| "Failed to connect to session bus")?;
+        zbus::Connection::new_session().with_context(|| "Failed to connect to session bus")?;
 
-    debug!(log, "Creating object server");
     let mut object_server = zbus::ObjectServer::new(&connection);
 
-    debug!(log, "Registering all search providers on object server");
-    register_search_providers(&log, &connection, &mut object_server)?;
-    info!(
-        log,
-        "All providers registered, acquiring {} and starting loop to handle DBus messages", BUSNAME
-    );
-    run_object_server_loop(
-        log.clone(),
-        connection,
-        object_server.request_name(BUSNAME)?,
-    )
+    register_search_providers(&connection, &mut object_server)?;
+    info!("All providers registered, acquiring {}", BUSNAME);
+    acquire_bus_name(&connection, BUSNAME)?;
+    info!("Acquired name {}, handling DBus events", BUSNAME);
+
+    run_dbus_loop(connection, move |message| {
+        match object_server.dispatch_message(&message) {
+            Ok(true) => trace!("Message dispatched to object server: {:?} ", message),
+            Ok(false) => warn!("Message not handled by object server: {:?}", message),
+            Err(error) => error!(
+                "Failed to dispatch message {:?} on object server: {}",
+                message, error
+            ),
+        }
+    })
     .map_err(Into::into)
 }
 
@@ -430,19 +431,16 @@ Set $RUST_LOG to control the log level",
             println!("{}", label)
         }
     } else {
-        let logger = create_service_logger(o!("version" => env!("CARGO_PKG_VERSION")));
-        slog_stdlog::init().unwrap();
-        let _guard = slog_scope::set_global_logger(logger.clone());
+        setup_logging_for_service(env!("CARGO_PKG_VERSION"));
 
         info!(
-            logger,
             "Started {} version: {}",
             env!("CARGO_BIN_NAME"),
             env!("CARGO_PKG_VERSION")
         );
 
-        if let Err(err) = start_dbus_service(&logger) {
-            error!(logger, "Main loop error: {:#}", err);
+        if let Err(err) = start_dbus_service() {
+            error!("Main loop error: {:#}", err);
             std::process::exit(1)
         }
     }

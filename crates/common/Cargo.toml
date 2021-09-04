@@ -11,19 +11,16 @@ license = "MPL-2.0"
 publish = false
 
 [dependencies]
-indexmap = "^1.7.0"
-zbus = "2.0.0-beta.6"
+indexmap = "^1.6"
+# Pin zbus, later versions break mainloop integration, see https://gitlab.freedesktop.org/dbus/zbus/-/issues/195
+zbus = "=2.0.0-beta.3"
 thiserror = "^1.0"
+log = "^0.4"
 gio = "^0.14"
 libc = "^0.2"
-nix = "^0.22"
-systemd = "^0.9"
-slog = "^2.7"
-slog-journald = "^2.1"
-slog-term = "^2.8"
-slog-stdlog = "^4.1"
-slog-scope = "^4.4"
-slog-envlogger = { version = "^2.2", default-features = false }
+env_logger = "^0.9"
+systemd-journal-logger = "^0.3"
+libsystemd = "^0.3"
 
 [dev-dependencies]
 pretty_assertions = "^0.7"

@@ -8,13 +8,11 @@
 
 use std::os::unix::io::AsRawFd;
 
-use slog::{debug, error, o, Logger};
+use log::{debug, error, trace};
 use thiserror::Error;
 
 use gio::glib;
-use glib::source::SourceId;
-use slog::warn;
-use zbus::ObjectServer;
+use gio::glib::source::SourceId;
 
 /// An error occurred while starting the main loop.
 #[derive(Error, Debug)]
@@ -30,86 +28,63 @@ pub enum MainLoopError {
 ///
 /// `on_message` is not required to be `Send` but the calling thread needs to
 /// own the main context to make sure that `on_message` remains on the main thread.
-pub fn source_add_connection_local<F: FnMut(&zbus::Message) + 'static>(
-    log: Logger,
+pub fn source_add_connection_local<F: FnMut(zbus::Message) + 'static>(
     connection: zbus::Connection,
     mut on_message: F,
 ) -> SourceId {
-    let fd = connection.as_raw_fd();
-    glib::source::unix_fd_add_local(
-        fd,
-        glib::IOCondition::IN | glib::IOCondition::PRI,
-        move |_, condition| {
-            debug!(
-                log,
-                "Connection {file_descriptor} entered IO condition {:?}",
-                condition,
-                file_descriptor = fd
-            );
-            match connection.receive_message() {
-                Ok(message) => on_message(&message),
-                Err(err) => error!(
-                    log,
-                    "Failed to process message on connection {}: {:#}", fd, err,
-                ),
-            }
-            glib::Continue(true)
-        },
-    )
+    let conditions = glib::IOCondition::IN | glib::IOCondition::PRI;
+    debug!(
+        "Watching connection fd {} for conditions {:?}",
+        connection.as_raw_fd(),
+        conditions
+    );
+    glib::source::unix_fd_add_local(connection.as_raw_fd(), conditions, move |_, condition| {
+        trace!("Connection entered IO condition {:?}", condition);
+        match connection.receive_message() {
+            Ok(message) => on_message(message),
+            Err(err) => error!("Failed to process message: {:#}", err),
+        }
+        glib::Continue(true)
+    })
 }
 
-/// Handle messages received on the given `connection` with `on_message`.
-pub fn run_dbus_loop<F: FnMut(&zbus::Message) + 'static>(
-    log: Logger,
+/// Connect to session bus, acquire the given name on the bus, and start handling messages.
+pub fn run_dbus_loop<F: FnMut(zbus::Message) + 'static>(
     connection: zbus::Connection,
     on_message: F,
 ) -> Result<(), MainLoopError> {
+    trace!("Acquire main context");
     let context = glib::MainContext::default();
     let guard = context
         .acquire()
         .map_err(|_| MainLoopError::FailedToAcquireContext)?;
     let mainloop = glib::MainLoop::new(Some(&context), false);
 
-    source_add_connection_local(log.new(o!()), connection, on_message);
+    source_add_connection_local(connection, on_message);
 
+    trace!("Listening for SIGTERM");
     glib::source::unix_signal_add(
         libc::SIGTERM,
-        glib::clone!(@strong mainloop, @strong log =>  move || {
-            debug!(log, "Received {signal}, quitting mainloop", signal = "SIGTERM");
+        glib::clone!(@strong mainloop =>  move || {
+            debug!("Terminated, quitting mainloop");
             mainloop.quit();
             glib::Continue(false)
         }),
     );
 
+    trace!("Listening for SIGINT");
     glib::source::unix_signal_add(
         libc::SIGINT,
-        glib::clone!(@strong mainloop, @strong log =>  move || {
-            debug!(log, "Received {signal}, quitting mainloop", signal = "SIGINT");
+        glib::clone!(@strong mainloop =>  move || {
+            debug!("Interrupted, quitting mainloop");
             mainloop.quit();
             glib::Continue(false)
         }),
     );
 
+    trace!("mainloop run");
     mainloop.run();
     // We no longer require the main context.
     drop(guard);
     Ok(())
-}
-
-/// Dispatch messages received on the given `connection` to the given `object_server`.
-pub fn run_object_server_loop(
-    log: Logger,
-    connection: zbus::Connection,
-    mut object_server: ObjectServer,
-) -> Result<(), MainLoopError> {
-    run_dbus_loop(log.clone(), connection, move |message| match object_server
-        .dispatch_message(message)
-    {
-        Ok(true) => debug!(log, "Message dispatched to object server: {:?} ", message),
-        Ok(false) => warn!(log, "Message not handled by object server: {:?}", message),
-        Err(error) => error!(
-            log,
-            "Failed to dispatch message {:?} on object server: {}", message, error
-        ),
-    })
 }

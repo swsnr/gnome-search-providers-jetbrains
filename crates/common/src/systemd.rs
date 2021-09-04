@@ -6,35 +6,11 @@
 
 //! Systemd utilities.
 
-use libc::{dev_t, ino_t, pid_t};
-use slog::{debug, trace, Logger};
-use std::os::unix::io::{AsRawFd, RawFd};
-use std::str::FromStr;
+use libc::pid_t;
+use libsystemd::unit::escape_name;
+use log::{debug, trace};
 use zbus::dbus_proxy;
 use zbus::export::zvariant::{OwnedObjectPath, Value};
-
-fn fd_has_device_and_inode(fd: RawFd, device: dev_t, inode: ino_t) -> bool {
-    nix::sys::stat::fstat(fd).map_or(false, |stat| stat.st_dev == device && stat.st_ino == inode)
-}
-
-/// Whether the standard error of this process is connected to the systemd journal.
-///
-/// Checks whether `$JOURNAL_STREAM` is set and non-empty, and points to stdout or stderr.
-///
-/// See [systemd.exec][1] for more information.
-///
-/// [1]: https://www.freedesktop.org/software/systemd/man/systemd.exec.html#Environment%20Variables%20in%20Spawned%20Processes
-pub fn connected_to_journal() -> bool {
-    std::env::var_os("JOURNAL_STREAM")
-        .as_ref()
-        .and_then(|value| value.to_str())
-        .and_then(|value| value.split_once(':'))
-        .and_then(|(device, inode)| u64::from_str(device).ok().zip(u64::from_str(inode).ok()))
-        .map_or(false, |(device, inode)| {
-            fd_has_device_and_inode(std::io::stderr().as_raw_fd(), device, inode)
-                || fd_has_device_and_inode(std::io::stdout().as_raw_fd(), device, inode)
-        })
-}
 
 /// The systemd manager DBUS API.
 ///
@@ -84,21 +60,8 @@ pub struct ScopeProperties<'a> {
     pub documentation: Vec<&'a str>,
 }
 
-/// The systemd manager on DBus.
-pub struct Systemd1Manager {
-    logger: Logger,
-    proxy: Systemd1ManagerProxy<'static>,
-}
-
-impl Systemd1Manager {
-    /// Connect to the systemd manager on the given `connection`.
-    ///
-    /// Use the given `logger` for logging.
-    pub fn new(logger: Logger, connection: &zbus::Connection) -> zbus::Result<Self> {
-        debug!(logger, "Connecting to systemd on {:?}", connection);
-        Systemd1ManagerProxy::new(connection).map(|proxy| Self { logger, proxy })
-    }
-
+/// Extensions to the systemd1 Manager API.
+pub trait Systemd1ManagerExt {
     /// Start a new systemd application scope for a running process.
     ///
     /// `properties` provides the name and the metadata for the new scope.
@@ -106,15 +69,21 @@ impl Systemd1Manager {
     /// `pid` is the process ID of the process to move into a new scope.
     ///
     /// Return the complete name and the DBUS object path of the new scope unit if successful.
-    pub fn start_app_scope(
+    fn start_app_scope(
+        &self,
+        properties: ScopeProperties,
+        pid: pid_t,
+    ) -> zbus::Result<(String, OwnedObjectPath)>;
+}
+
+impl Systemd1ManagerExt for Systemd1ManagerProxy<'_> {
+    // See https://gitlab.gnome.org/jf/start-transient-unit/-/blob/117c6f32c8dc0d1f28686408f698632aa71880bc/rust/src/main.rs#L94
+    // for inspiration.
+    fn start_app_scope(
         &self,
         properties: ScopeProperties,
         pid: pid_t,
     ) -> zbus::Result<(String, OwnedObjectPath)> {
-        trace!(self.logger, "start_app_scope({:?}, {})", properties, pid);
-        // See https://gitlab.gnome.org/jf/start-transient-unit/-/blob/117c6f32c8dc0d1f28686408f698632aa71880bc/rust/src/main.rs#L94
-        // for inspiration.
-        //
         // See https://www.freedesktop.org/wiki/Software/systemd/ControlGroupInterface/ for background.
         let mut props = vec![
             // I haven't found any documentation for the type of the PIDs property, but
@@ -146,20 +115,28 @@ impl Systemd1Manager {
         let name = format!(
             "{}-{}-{}.scope",
             properties.prefix,
-            systemd::unit::escape_name(properties.name),
+            escape_name(properties.name),
             pid
         );
-        debug!(self.logger, "Creating new scope {} for {}", &name, pid);
+        debug!("Creating new scope {} for {}", &name, pid);
+
         // We `fail` to start the scope if it already exists.
-        let result = self
-            .proxy
-            .start_transient_unit(&name, "fail", &props, &Vec::new());
+        let mode = "fail";
+        let aux = &[];
         trace!(
-            self.logger,
-            "StartTransientUnit({}, fail, {:?}, []) -> {:?}",
-            &name,
-            &props,
-            &result,
+            "StartTransientUnit({}, {}, {:?}, {:?})",
+            name,
+            mode,
+            props,
+            aux
+        );
+        let result = self.start_transient_unit(&name, mode, &props, aux);
+        trace!(
+            "StartTransientUnit({}, {}, {:?}, []) -> {:?}",
+            name,
+            mode,
+            props,
+            result
         );
         result.map(|objpath| (name, objpath))
     }
