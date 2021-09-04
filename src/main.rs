@@ -24,7 +24,7 @@ use std::convert::TryFrom;
 use gnome_search_provider_common::app::*;
 use gnome_search_provider_common::dbus::*;
 use gnome_search_provider_common::export::gio;
-use gnome_search_provider_common::export::gio::glib;
+use gnome_search_provider_common::export::glib;
 use gnome_search_provider_common::export::zbus;
 use gnome_search_provider_common::export::zbus::export::names::WellKnownName;
 use gnome_search_provider_common::log::*;

@@ -6,7 +6,6 @@
 
 //! Mainloop utilities for dbus serch providers.
 
-use gio::glib;
 use log::{debug, trace};
 
 /// Connect to session bus, acquire the given name on the bus, and start handling messages.

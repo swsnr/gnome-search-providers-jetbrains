@@ -20,5 +20,6 @@ mod systemd;
 pub mod export {
     pub use futures_util;
     pub use gio;
+    pub use glib;
     pub use zbus;
 }

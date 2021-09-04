@@ -8,8 +8,8 @@
 
 use std::collections::HashMap;
 
-use gio::glib::{MainContext, VariantDict};
 use gio::prelude::*;
+use glib::{MainContext, VariantDict};
 use indexmap::IndexMap;
 use libc::pid_t;
 use log::{debug, error, info, trace, warn};
