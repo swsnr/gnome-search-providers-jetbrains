@@ -6,11 +6,14 @@ and this project doesn't really care for versioning.
 
 ## [Unreleased]
 
+## [1.6.0] – 2021-08-28
+
 ### Added
 - Automatically detect whether to log to the systemd journal.
+- Improve debug logging.
 
 ### Removed
-- Remove `--journal-log` flag. 
+- Remove `--journal-log` flag.
 
 ## [1.5.0] – 2021-05-25
 
@@ -109,7 +112,8 @@ and this project doesn't really care for versioning.
 
 Initial prototype in Python, with support for Toolbox IDEA CE and WebStorm.
 
-[Unreleased]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/compare/v1.5.0...HEAD
+[Unreleased]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/compare/v1.6.0...HEAD
+[1.6.0]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/compare/v1.4.1...v1.5.0
 [1.4.1]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/compare/v1.3.0...v1.4.0
