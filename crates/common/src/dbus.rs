@@ -16,13 +16,31 @@ use zbus::fdo::{AsyncDBusProxy, RequestNameFlags, RequestNameReply};
 pub async fn request_name_exclusive(
     connection: &Connection,
     name: WellKnownName<'_>,
-) -> Result<RequestNameReply, zbus::fdo::Error> {
-    let flags = RequestNameFlags::DoNotQueue | RequestNameFlags::ReplaceExisting;
+) -> Result<(), zbus::fdo::Error> {
+    let flags = RequestNameFlags::DoNotQueue.into();
     trace!("RequestName({}, {:?})", name.as_str(), flags);
-    AsyncDBusProxy::new(connection)
+    let result = AsyncDBusProxy::new(connection)
         .await?
-        .request_name(name, flags)
-        .await
+        .request_name(name.clone(), flags)
+        .await;
+    trace!(
+        "RequestName({}, {:?}) -> {:?}",
+        name.as_str(),
+        flags,
+        result
+    );
+    let reply = result?;
+    match reply {
+        RequestNameReply::PrimaryOwner | RequestNameReply::AlreadyOwner => Ok(()),
+        RequestNameReply::Exists => Err(zbus::fdo::Error::AddressInUse(format!(
+            "Name {} already exists on bus",
+            name
+        ))),
+        RequestNameReply::InQueue => {
+            warn!("Inconsistent reply: Broker put process in queue for {} even though queuing was not requested", name);
+            Err(zbus::fdo::Error::ZBus(zbus::Error::InvalidReply))
+        }
+    }
 }
 
 /// Run an object server on the given connection.
