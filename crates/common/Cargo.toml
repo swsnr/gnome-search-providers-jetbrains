@@ -18,7 +18,7 @@ thiserror = "^1.0"
 log = "^0.4"
 gio = "^0.14"
 libc = "^0.2"
-env_logger = "^0.8"
+env_logger = "^0.9"
 systemd-journal-logger = "^0.3"
 libsystemd = "^0.3"
 
