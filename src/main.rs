@@ -361,7 +361,7 @@ fn register_search_providers(
                     app_id: provider.desktop_id.to_string(),
                     config: &provider.config,
                 },
-                Systemd1ManagerProxy::new(&connection)
+                Systemd1ManagerProxy::new(connection)
                     .with_context(|| "Failed to access systemd manager via DBUS")?,
                 SystemdScopeSettings {
                     prefix: concat!("app-", env!("CARGO_BIN_NAME")).to_string(),

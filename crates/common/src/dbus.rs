@@ -17,7 +17,7 @@ pub fn acquire_bus_name<S: AsRef<str>>(
 ) -> Result<RequestNameReply, zbus::fdo::Error> {
     let flags = RequestNameFlags::DoNotQueue | RequestNameFlags::ReplaceExisting;
     trace!("RequestName({}, {:?})", name.as_ref(), flags);
-    let result = DBusProxy::new(connection)?.request_name(name.as_ref(), flags.into());
+    let result = DBusProxy::new(connection)?.request_name(name.as_ref(), flags);
     trace!(
         "RequestName({}, {:?}) -> {:?}",
         name.as_ref(),
