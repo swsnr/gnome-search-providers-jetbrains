@@ -8,22 +8,6 @@
 
 use crate::export::futures_util::StreamExt;
 use log::{error, trace, warn};
-use zbus::azync::Connection;
-use zbus::export::names::WellKnownName;
-use zbus::fdo::{AsyncDBusProxy, RequestNameFlags, RequestNameReply};
-
-/// Acquire a name on the given connection.
-pub async fn request_name_exclusive(
-    connection: &Connection,
-    name: WellKnownName<'_>,
-) -> Result<RequestNameReply, zbus::fdo::Error> {
-    let flags = RequestNameFlags::DoNotQueue | RequestNameFlags::ReplaceExisting;
-    trace!("RequestName({}, {:?})", name.as_str(), flags);
-    AsyncDBusProxy::new(connection)
-        .await?
-        .request_name(name, flags)
-        .await
-}
 
 /// Run an object server on the given connection.
 ///

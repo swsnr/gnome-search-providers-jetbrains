@@ -19,14 +19,12 @@ use elementtree::Element;
 use lazy_static::lazy_static;
 use log::{debug, error, info, trace};
 use regex::Regex;
-use std::convert::TryFrom;
 
 use gnome_search_provider_common::app::*;
 use gnome_search_provider_common::dbus::*;
 use gnome_search_provider_common::export::gio;
 use gnome_search_provider_common::export::gio::glib;
 use gnome_search_provider_common::export::zbus;
-use gnome_search_provider_common::export::zbus::export::names::WellKnownName;
 use gnome_search_provider_common::log::*;
 use gnome_search_provider_common::mainloop::*;
 use gnome_search_provider_common::matching::*;
@@ -397,12 +395,9 @@ fn start_dbus_service() -> Result<()> {
     register_search_providers(&connection, &mut object_server)?;
 
     info!("All providers registered, acquiring {}", BUSNAME);
-    context
-        .block_on(request_name_exclusive(
-            connection.inner(),
-            WellKnownName::try_from(BUSNAME).unwrap(),
-        ))
-        .with_context(|| format!("Failed to request {}", BUSNAME))?;
+    let object_server = object_server
+        .request_name(BUSNAME)
+        .with_context(|| format!("Failed to request bus name {}", BUSNAME))?;
 
     info!("Name acquired, starting server and main loop");
     context.spawn_local(run_server(connection.inner().clone(), object_server));
