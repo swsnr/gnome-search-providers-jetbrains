@@ -22,6 +22,7 @@ use regex::Regex;
 
 use gnome_search_provider_common::app::*;
 use gnome_search_provider_common::dbus::acquire_bus_name;
+use gnome_search_provider_common::export::gio;
 use gnome_search_provider_common::export::zbus;
 use gnome_search_provider_common::log::*;
 use gnome_search_provider_common::mainloop::run_dbus_loop;

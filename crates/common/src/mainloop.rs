@@ -11,7 +11,8 @@ use std::os::unix::io::AsRawFd;
 use log::{debug, error};
 use thiserror::Error;
 
-use glib::source::SourceId;
+use gio::glib;
+use gio::glib::source::SourceId;
 
 /// An error occurred while starting the main loop.
 #[derive(Error, Debug)]
@@ -51,32 +52,33 @@ pub fn run_dbus_loop<F: FnMut(zbus::Message) + 'static>(
     on_message: F,
 ) -> Result<(), MainLoopError> {
     let context = glib::MainContext::default();
-    if !context.acquire() {
-        Err(MainLoopError::FailedToAcquireContext)
-    } else {
-        let mainloop = glib::MainLoop::new(Some(&context), false);
+    let guard = context
+        .acquire()
+        .map_err(|_| MainLoopError::FailedToAcquireContext)?;
+    let mainloop = glib::MainLoop::new(Some(&context), false);
 
-        source_add_connection_local(connection, on_message);
+    source_add_connection_local(connection, on_message);
 
-        glib::source::unix_signal_add(
-            libc::SIGTERM,
-            glib::clone!(@strong mainloop =>  move || {
-                debug!("Terminated, quitting mainloop");
-                mainloop.quit();
-                glib::Continue(false)
-            }),
-        );
+    glib::source::unix_signal_add(
+        libc::SIGTERM,
+        glib::clone!(@strong mainloop =>  move || {
+            debug!("Terminated, quitting mainloop");
+            mainloop.quit();
+            glib::Continue(false)
+        }),
+    );
 
-        glib::source::unix_signal_add(
-            libc::SIGINT,
-            glib::clone!(@strong mainloop =>  move || {
-                debug!("Interrupted, quitting mainloop");
-                mainloop.quit();
-                glib::Continue(false)
-            }),
-        );
+    glib::source::unix_signal_add(
+        libc::SIGINT,
+        glib::clone!(@strong mainloop =>  move || {
+            debug!("Interrupted, quitting mainloop");
+            mainloop.quit();
+            glib::Continue(false)
+        }),
+    );
 
-        mainloop.run();
-        Ok(())
-    }
+    mainloop.run();
+    // We no longer require the main context.
+    drop(guard);
+    Ok(())
 }
