@@ -31,7 +31,7 @@ pub fn acquire_bus_name<S: AsRef<str>>(
     connection: &Connection,
     name: S,
 ) -> Result<(), AcquireNameError> {
-    let reply = DBusProxy::new(&connection)?
+    let reply = DBusProxy::new(connection)?
         .request_name(name.as_ref(), RequestNameFlags::DoNotQueue.into())?;
     if reply == RequestNameReply::PrimaryOwner {
         Ok(())

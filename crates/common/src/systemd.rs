@@ -115,7 +115,7 @@ impl Systemd1ManagerExt for Systemd1ManagerProxy<'_> {
         let name = format!(
             "{}-{}-{}.scope",
             properties.prefix,
-            escape_name(&properties.name),
+            escape_name(properties.name),
             pid
         );
         debug!("Creating new scope {} for {}", &name, pid);

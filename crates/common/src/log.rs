@@ -64,7 +64,7 @@ pub fn setup_logging_for_service(version: &'static str) {
             .parse(
                 std::env::var(env_logger::DEFAULT_FILTER_ENV)
                     .as_ref()
-                    .map_or(default_filter, |f| &f),
+                    .map_or(default_filter, |f| f),
             )
             .build();
         log::set_boxed_logger(Box::new(FilteredLog {
