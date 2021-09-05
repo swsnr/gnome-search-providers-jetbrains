@@ -17,17 +17,19 @@ use std::str::FromStr;
 use anyhow::{Context, Result};
 use elementtree::Element;
 use lazy_static::lazy_static;
-use log::{debug, error, info, trace, warn};
+use log::{debug, error, info, trace};
 use regex::Regex;
+use std::convert::TryFrom;
 
 use gnome_search_provider_common::app::*;
-use gnome_search_provider_common::dbus::acquire_bus_name;
+use gnome_search_provider_common::dbus::*;
 use gnome_search_provider_common::export::gio;
+use gnome_search_provider_common::export::glib;
 use gnome_search_provider_common::export::zbus;
+use gnome_search_provider_common::export::zbus::export::names::WellKnownName;
 use gnome_search_provider_common::log::*;
-use gnome_search_provider_common::mainloop::run_dbus_loop;
+use gnome_search_provider_common::mainloop::*;
 use gnome_search_provider_common::matching::*;
-use gnome_search_provider_common::systemd::Systemd1ManagerProxy;
 
 /// A path with an associated version.
 #[derive(Debug)]
@@ -348,6 +350,14 @@ fn register_search_providers(
     connection: &zbus::Connection,
     object_server: &mut zbus::ObjectServer,
 ) -> Result<()> {
+    let launch_context = create_launch_context(
+        connection.clone(),
+        SystemdScopeSettings {
+            prefix: concat!("app-", env!("CARGO_BIN_NAME")).to_string(),
+            started_by: env!("CARGO_BIN_NAME").to_string(),
+            documentation: vec![env!("CARGO_PKG_HOMEPAGE").to_string()],
+        },
+    );
     for provider in PROVIDERS {
         if let Some(app) = gio::DesktopAppInfo::new(provider.desktop_id) {
             info!(
@@ -361,13 +371,7 @@ fn register_search_providers(
                     app_id: provider.desktop_id.to_string(),
                     config: &provider.config,
                 },
-                Systemd1ManagerProxy::new(connection)
-                    .with_context(|| "Failed to access systemd manager via DBUS")?,
-                SystemdScopeSettings {
-                    prefix: concat!("app-", env!("CARGO_BIN_NAME")).to_string(),
-                    started_by: env!("CARGO_BIN_NAME").to_string(),
-                    documentation: vec![env!("CARGO_PKG_HOMEPAGE").to_string()],
-                },
+                launch_context.clone(),
             );
             object_server.at(provider.objpath().as_str(), dbus_provider)?;
         }
@@ -383,27 +387,30 @@ fn register_search_providers(
 /// Then register the connection on the Glib main loop and install a callback to
 /// handle incoming messages.
 fn start_dbus_service() -> Result<()> {
+    let mainloop = create_main_loop();
+    let context = glib::MainContext::ref_thread_default();
+
     let connection =
-        zbus::Connection::new_session().with_context(|| "Failed to connect to session bus")?;
+        zbus::Connection::session().with_context(|| "Failed to connect to session bus")?;
 
+    info!("Registering all search providers");
     let mut object_server = zbus::ObjectServer::new(&connection);
-
     register_search_providers(&connection, &mut object_server)?;
-    info!("All providers registered, acquiring {}", BUSNAME);
-    acquire_bus_name(&connection, BUSNAME)?;
-    info!("Acquired name {}, handling DBus events", BUSNAME);
 
-    run_dbus_loop(connection, move |message| {
-        match object_server.dispatch_message(&message) {
-            Ok(true) => trace!("Message dispatched to object server: {:?} ", message),
-            Ok(false) => warn!("Message not handled by object server: {:?}", message),
-            Err(error) => error!(
-                "Failed to dispatch message {:?} on object server: {}",
-                message, error
-            ),
-        }
-    })
-    .map_err(Into::into)
+    info!("All providers registered, acquiring {}", BUSNAME);
+    context
+        .block_on(request_name_exclusive(
+            connection.inner(),
+            WellKnownName::try_from(BUSNAME).unwrap(),
+        ))
+        .with_context(|| format!("Failed to request {}", BUSNAME))?;
+
+    info!("Name acquired, starting server and main loop");
+    context.spawn_local(run_server(connection.inner().clone(), object_server));
+
+    mainloop.run();
+
+    Ok(())
 }
 
 fn main() {

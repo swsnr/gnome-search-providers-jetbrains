@@ -55,6 +55,7 @@ impl<T: Log> Log for FilteredLog<T> {
 ///
 /// The maximum level is set to "info", unless the `$LOG_DEBUG` environment variable is set in which case it's "debug".
 pub fn setup_logging_for_service(version: &'static str) {
+    glib::log_set_default_handler(glib::rust_log_handler);
     let default_filter = "info";
     let env = env_logger::Env::default().default_filter_or(default_filter);
     if connected_to_journal() {

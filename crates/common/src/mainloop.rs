@@ -6,61 +6,15 @@
 
 //! Mainloop utilities for dbus serch providers.
 
-use std::os::unix::io::AsRawFd;
-
-use log::{debug, error, trace};
-use thiserror::Error;
-
-use gio::glib;
-use gio::glib::source::SourceId;
-
-/// An error occurred while starting the main loop.
-#[derive(Error, Debug)]
-pub enum MainLoopError {
-    /// Failed to acquire the main Glib context.
-    #[error("Failed to acquire context")]
-    FailedToAcquireContext,
-}
-
-/// Add `connection` as source to the default Glib mainloop.
-///
-/// Invoke `on_message` for every message received from `connection`.
-///
-/// `on_message` is not required to be `Send` but the calling thread needs to
-/// own the main context to make sure that `on_message` remains on the main thread.
-pub fn source_add_connection_local<F: FnMut(zbus::Message) + 'static>(
-    connection: zbus::Connection,
-    mut on_message: F,
-) -> SourceId {
-    let conditions = glib::IOCondition::IN | glib::IOCondition::PRI;
-    debug!(
-        "Watching connection fd {} for conditions {:?}",
-        connection.as_raw_fd(),
-        conditions
-    );
-    glib::source::unix_fd_add_local(connection.as_raw_fd(), conditions, move |_, condition| {
-        trace!("Connection entered IO condition {:?}", condition);
-        match connection.receive_message() {
-            Ok(message) => on_message(message),
-            Err(err) => error!("Failed to process message: {:#}", err),
-        }
-        glib::Continue(true)
-    })
-}
+use log::{debug, trace};
 
 /// Connect to session bus, acquire the given name on the bus, and start handling messages.
-pub fn run_dbus_loop<F: FnMut(zbus::Message) + 'static>(
-    connection: zbus::Connection,
-    on_message: F,
-) -> Result<(), MainLoopError> {
+pub fn create_main_loop() -> glib::MainLoop {
     trace!("Acquire main context");
     let context = glib::MainContext::default();
-    let guard = context
-        .acquire()
-        .map_err(|_| MainLoopError::FailedToAcquireContext)?;
-    let mainloop = glib::MainLoop::new(Some(&context), false);
+    context.push_thread_default();
 
-    source_add_connection_local(connection, on_message);
+    let mainloop = glib::MainLoop::new(Some(&context), false);
 
     trace!("Listening for SIGTERM");
     glib::source::unix_signal_add(
@@ -82,9 +36,5 @@ pub fn run_dbus_loop<F: FnMut(zbus::Message) + 'static>(
         }),
     );
 
-    trace!("mainloop run");
-    mainloop.run();
-    // We no longer require the main context.
-    drop(guard);
-    Ok(())
+    mainloop
 }
