@@ -6,6 +6,8 @@ and this project doesn't really care for versioning.
 
 ## [Unreleased]
 
+## [1.7.0] – 2021-09-08
+
 ### Fixed
 - Fix handling of DBus message.
 
@@ -117,7 +119,8 @@ and this project doesn't really care for versioning.
 
 Initial prototype in Python, with support for Toolbox IDEA CE and WebStorm.
 
-[Unreleased]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/compare/v1.6.0...HEAD
+[Unreleased]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/compare/v1.7.0...HEAD
+[1.7.0]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/compare/v1.4.1...v1.5.0
 [1.4.1]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/compare/v1.4.0...v1.4.1
