@@ -6,6 +6,8 @@ and this project doesn't really care for versioning.
 
 ## [Unreleased]
 
+## [1.7.1] – 2021-09-08
+
 ### Fixed
 - Properly consider log level for journald logging.
 
@@ -122,7 +124,8 @@ and this project doesn't really care for versioning.
 
 Initial prototype in Python, with support for Toolbox IDEA CE and WebStorm.
 
-[Unreleased]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/compare/v1.7.0...HEAD
+[Unreleased]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/compare/v1.7.1...HEAD
+[1.7.1]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/compare/v1.7.0...v1.7.1
 [1.7.0]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/compare/v1.4.1...v1.5.0
