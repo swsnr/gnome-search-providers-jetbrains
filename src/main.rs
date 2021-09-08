@@ -8,6 +8,7 @@
 
 //! Gnome search provider for Jetbrains products
 
+use std::convert::TryFrom;
 use std::ffi::OsStr;
 use std::fs::File;
 use std::io::Read;
@@ -19,7 +20,6 @@ use elementtree::Element;
 use lazy_static::lazy_static;
 use log::{debug, error, info, trace};
 use regex::Regex;
-use std::convert::TryFrom;
 
 use gnome_search_provider_common::app::*;
 use gnome_search_provider_common::dbus::*;
@@ -405,7 +405,7 @@ fn start_dbus_service() -> Result<()> {
         ))
         .with_context(|| format!("Failed to request {}", BUSNAME))?;
 
-    info!("Name acquired, starting server and main loop");
+    info!("Acquired name {}, starting server and main loop", BUSNAME);
     context.spawn_local(run_server(connection.inner().clone(), object_server));
 
     mainloop.run();

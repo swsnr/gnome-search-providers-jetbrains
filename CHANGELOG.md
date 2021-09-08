@@ -6,6 +6,9 @@ and this project doesn't really care for versioning.
 
 ## [Unreleased]
 
+### Fixed
+- Properly consider log level for journald logging.
+
 ## [1.7.0] – 2021-09-08
 
 ### Fixed

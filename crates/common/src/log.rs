@@ -68,11 +68,13 @@ pub fn setup_logging_for_service(version: &'static str) {
                     .map_or(default_filter, |f| f),
             )
             .build();
+        let max_level = filter.filter();
         log::set_boxed_logger(Box::new(FilteredLog {
             log: journal,
             filter,
         }))
         .unwrap();
+        log::set_max_level(max_level);
     } else {
         env_logger::Builder::from_env(env).init();
     }
