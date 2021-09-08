@@ -6,7 +6,12 @@ and this project doesn't really care for versioning.
 
 ## [Unreleased]
 
+### Fixed
+- Fix handling of DBus message.
+
 ## [1.6.0] – 2021-08-28
+
+**This release is broken, do not use.**
 
 ### Added
 - Automatically detect whether to log to the systemd journal.
