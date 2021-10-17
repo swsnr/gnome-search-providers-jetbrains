@@ -9,12 +9,8 @@
 use log::{debug, trace};
 
 /// Connect to session bus, acquire the given name on the bus, and start handling messages.
-pub fn create_main_loop() -> glib::MainLoop {
-    trace!("Acquire main context");
-    let context = glib::MainContext::default();
-    context.push_thread_default();
-
-    let mainloop = glib::MainLoop::new(Some(&context), false);
+pub fn create_main_loop(context: &glib::MainContext) -> glib::MainLoop {
+    let mainloop = glib::MainLoop::new(Some(context), false);
 
     trace!("Listening for SIGTERM");
     glib::source::unix_signal_add(

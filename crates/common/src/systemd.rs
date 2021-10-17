@@ -10,7 +10,7 @@ use libc::pid_t;
 use libsystemd::unit::escape_name;
 use log::{debug, trace};
 use zbus::dbus_proxy;
-use zbus::export::zvariant::{OwnedObjectPath, Value};
+use zbus::zvariant::{OwnedObjectPath, Value};
 
 /// The systemd manager DBUS API.
 ///
@@ -68,7 +68,7 @@ pub struct ScopeProperties<'a> {
 ///
 /// Return the complete name and the DBUS object path of the new scope unit if successful.
 pub async fn start_app_scope(
-    manager: &AsyncSystemd1ManagerProxy<'_>,
+    manager: &Systemd1ManagerProxy<'_>,
     properties: ScopeProperties<'_>,
     pid: pid_t,
 ) -> zbus::Result<(String, OwnedObjectPath)> {
