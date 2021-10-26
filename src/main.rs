@@ -371,6 +371,12 @@ async fn register_search_providers(
     Ok(())
 }
 
+async fn tick(connection: zbus::Connection) {
+    loop {
+        connection.executor().tick().await
+    }
+}
+
 /// Starts the DBUS service.
 ///
 /// Connect to the session bus and register a new DBus object for every provider
@@ -379,9 +385,13 @@ async fn register_search_providers(
 /// Then register the connection on the Glib main loop and install a callback to
 /// handle incoming messages.
 async fn start_dbus_service() -> Result<()> {
-    let connection = zbus::Connection::session()
+    let connection = zbus::ConnectionBuilder::session()?
+        .internal_executor(false)
+        .build()
         .await
         .with_context(|| "Failed to connect to session bus")?;
+
+    glib::MainContext::ref_thread_default().spawn(tick(connection.clone()));
 
     info!("Registering all search providers");
     let launch_context = create_launch_context(
