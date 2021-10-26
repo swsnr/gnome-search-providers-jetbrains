@@ -76,7 +76,7 @@ impl<S: ItemsSource<AppLaunchItem> + Send + Sync + 'static> AppItemSearchProvide
     ///
     /// This function is called to refine the initial search results when the user types more characters in the search entry.
     /// It gets the previous search results and the current search terms as arguments, and should return an array of result IDs,
-    /// just like GetInitialResulSet.
+    /// just like GetInitialResultSet.
     fn get_subsearch_result_set(
         &self,
         previous_results: Vec<&str>,
@@ -122,7 +122,7 @@ impl<S: ItemsSource<AppLaunchItem> + Send + Sync + 'static> AppItemSearchProvide
     //  - "id": the result ID
     //  - "name": the display name for the result
     //  - "icon": a serialized GIcon (see g_icon_serialize()), or alternatively,
-    //  - "gicon": a textual representation of a GIcon (see g_icon_to_string()), or alternativly,
+    //  - "gicon": a textual representation of a GIcon (see g_icon_to_string()), or alternatively,
     //  - "icon-data": a tuple of type (iiibiiay) describing a pixbuf with width, height, rowstride, has-alpha, bits-per-sample, and image data
     //  - "description": an optional short description (1-2 lines)
     fn get_result_metas(&self, results: Vec<String>) -> Vec<HashMap<String, zvariant::Value>> {
