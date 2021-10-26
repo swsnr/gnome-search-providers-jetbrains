@@ -22,14 +22,13 @@ use log::{debug, error, info, trace};
 use regex::Regex;
 
 use gnome_search_provider_common::app::*;
-use gnome_search_provider_common::dbus::*;
-use gnome_search_provider_common::export::gio;
-use gnome_search_provider_common::export::glib;
-use gnome_search_provider_common::export::zbus;
-use gnome_search_provider_common::export::zbus::export::names::WellKnownName;
+use gnome_search_provider_common::gio;
+use gnome_search_provider_common::gio::glib;
 use gnome_search_provider_common::log::*;
 use gnome_search_provider_common::mainloop::*;
 use gnome_search_provider_common::matching::*;
+use gnome_search_provider_common::zbus;
+use gnome_search_provider_common::zbus::names::WellKnownName;
 
 /// A path with an associated version.
 #[derive(Debug)]
@@ -346,18 +345,11 @@ impl<'a> ItemsSource<AppLaunchItem> for JetbrainsProjectsSource<'a> {
 /// The name to request on the bus.
 const BUSNAME: &str = "de.swsnr.searchprovider.Jetbrains";
 
-fn register_search_providers(
+async fn register_search_providers(
     connection: &zbus::Connection,
-    object_server: &mut zbus::ObjectServer,
+    launch_service: &AppLaunchService,
 ) -> Result<()> {
-    let launch_context = create_launch_context(
-        connection.clone(),
-        SystemdScopeSettings {
-            prefix: concat!("app-", env!("CARGO_BIN_NAME")).to_string(),
-            started_by: env!("CARGO_BIN_NAME").to_string(),
-            documentation: vec![env!("CARGO_PKG_HOMEPAGE").to_string()],
-        },
-    );
+    let mut object_server = connection.object_server_mut().await;
     for provider in PROVIDERS {
         if let Some(app) = gio::DesktopAppInfo::new(provider.desktop_id) {
             info!(
@@ -366,12 +358,12 @@ fn register_search_providers(
                 provider.objpath()
             );
             let dbus_provider = AppItemSearchProvider::new(
-                app,
+                app.into(),
                 JetbrainsProjectsSource {
                     app_id: provider.desktop_id.to_string(),
                     config: &provider.config,
                 },
-                launch_context.clone(),
+                launch_service.client(),
             );
             object_server.at(provider.objpath().as_str(), dbus_provider)?;
         }
@@ -386,30 +378,31 @@ fn register_search_providers(
 ///
 /// Then register the connection on the Glib main loop and install a callback to
 /// handle incoming messages.
-fn start_dbus_service() -> Result<()> {
-    let mainloop = create_main_loop();
-    let context = glib::MainContext::ref_thread_default();
-
-    let connection =
-        zbus::Connection::session().with_context(|| "Failed to connect to session bus")?;
+async fn start_dbus_service() -> Result<()> {
+    let connection = zbus::Connection::session()
+        .await
+        .with_context(|| "Failed to connect to session bus")?;
 
     info!("Registering all search providers");
-    let mut object_server = zbus::ObjectServer::new(&connection);
-    register_search_providers(&connection, &mut object_server)?;
+    let launch_context = create_launch_context(
+        connection.clone(),
+        SystemdScopeSettings {
+            prefix: concat!("app-", env!("CARGO_BIN_NAME")).to_string(),
+            started_by: env!("CARGO_BIN_NAME").to_string(),
+            documentation: vec![env!("CARGO_PKG_HOMEPAGE").to_string()],
+        },
+    );
+    let launch_service =
+        AppLaunchService::new(&glib::MainContext::ref_thread_default(), launch_context);
+    register_search_providers(&connection, &launch_service).await?;
 
     info!("All providers registered, acquiring {}", BUSNAME);
-    context
-        .block_on(request_name_exclusive(
-            connection.inner(),
-            WellKnownName::try_from(BUSNAME).unwrap(),
-        ))
+    connection
+        .request_name(WellKnownName::try_from(BUSNAME).unwrap())
+        .await
         .with_context(|| format!("Failed to request {}", BUSNAME))?;
 
-    info!("Acquired name {}, starting server and main loop", BUSNAME);
-    context.spawn_local(run_server(connection.inner().clone(), object_server));
-
-    mainloop.run();
-
+    info!("Acquired name {}, serving search providers", BUSNAME);
     Ok(())
 }
 
@@ -446,9 +439,15 @@ Set $RUST_LOG to control the log level",
             env!("CARGO_PKG_VERSION")
         );
 
-        if let Err(err) = start_dbus_service() {
-            error!("Main loop error: {:#}", err);
-            std::process::exit(1)
+        trace!("Acquire main context");
+        let context = glib::MainContext::default();
+        context.push_thread_default();
+
+        if let Err(error) = context.block_on(start_dbus_service()) {
+            error!("Failed to start DBus server: {}", error);
+            std::process::exit(1);
+        } else {
+            create_main_loop(&context).run();
         }
     }
 }

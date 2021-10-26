@@ -9,7 +9,6 @@
 #![deny(warnings, missing_docs, clippy::all)]
 
 pub mod app;
-pub mod dbus;
 pub mod log;
 pub mod mainloop;
 pub mod matching;
@@ -17,9 +16,7 @@ pub mod matching;
 mod systemd;
 
 /// Re-exports.
-pub mod export {
-    pub use futures_util;
-    pub use gio;
-    pub use glib;
-    pub use zbus;
-}
+pub use futures_util;
+pub use gio;
+pub use glib;
+pub use zbus;
