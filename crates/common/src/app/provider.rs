@@ -145,7 +145,7 @@ impl<S: ItemsSource<AppLaunchItem> + Send + Sync + 'static> AppItemSearchProvide
             })
             .collect();
 
-        trace!("GetResultMetas({:?} -> {:?}", results, &metas);
+        trace!("GetResultMetas({:?}) -> {:?}", results, &metas);
         metas
     }
 
