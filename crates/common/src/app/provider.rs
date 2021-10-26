@@ -202,22 +202,23 @@ impl<S: ItemsSource<AppLaunchItem> + Send + Sync + 'static> AppItemSearchProvide
     fn launch_search(&self, terms: Vec<String>, timestamp: u32) -> zbus::fdo::Result<()> {
         trace!("Enter LaunchSearch({:?}, {:?})", terms, timestamp);
         info!("Launching app {} directly", self.app.id());
-        // let result = self
-        //     .app
-        //     .launch(&[], Some(&self.launch_context))
-        //     .map_err(|error| {
-        //         error!(
-        //             "Failed to launch app {}: {:#}",
-        //             self.app.id().unwrap(),
-        //             error
-        //         );
-        //         zbus::fdo::Error::SpawnFailed(format!(
-        //             "Failed to launch app {}: {}",
-        //             self.app.id().unwrap(),
-        //             error
-        //         ))
-        //     });
-        trace!("Enter LaunchSearch({:?}, {:?}) -> ()", terms, timestamp,);
-        Ok(())
+        let result = self
+            .launcher
+            .launch(AppLaunchRequest::without_args((*self.app.id()).clone()))
+            .map_err(|error| {
+                error!("Failed to launch app {}: {}", self.app.id(), error);
+                zbus::fdo::Error::Failed(format!(
+                    "Failed to launch app {}: {}",
+                    self.app.id(),
+                    error
+                ))
+            });
+        trace!(
+            "Enter LaunchSearch({:?}, {:?}) -> {:?}",
+            terms,
+            timestamp,
+            result
+        );
+        result
     }
 }
