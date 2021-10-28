@@ -25,7 +25,7 @@ clap = { version = "^2.33", default-features = false }
 gnome-search-provider-common = { path = "./crates/common" }
 
 [dev-dependencies]
-pretty_assertions = "^0.7"
+pretty_assertions = "^1"
 rust-ini = "^0.17"
 
 [workspace]

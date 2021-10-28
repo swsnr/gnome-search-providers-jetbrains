@@ -19,8 +19,8 @@ gio = "^0.14"
 glib = { version="^0.14", features=["log"] }
 libc = "^0.2"
 env_logger = "^0.9"
-systemd-journal-logger = "^0.3"
-libsystemd = "^0.3"
+systemd-journal-logger = "^0.4"
+libsystemd = "^0.4"
 
 [dev-dependencies]
-pretty_assertions = "^0.7"
+pretty_assertions = "^1"
