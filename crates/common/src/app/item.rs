@@ -9,33 +9,14 @@
 use crate::matching::ScoreMatchable;
 use log::trace;
 
-/// A target for launching an app.
-#[derive(Debug, PartialEq, Clone)]
-pub enum AppLaunchTarget {
-    /// A URI to launch.
-    Uri(String),
-    /// A file to launch.
-    File(String),
-}
-
-impl AppLaunchTarget {
-    /// The description for this launch target.
-    pub fn description(&self) -> &str {
-        match self {
-            AppLaunchTarget::Uri(uri) => uri,
-            AppLaunchTarget::File(path) => path,
-        }
-    }
-}
-
 /// A recent item from the file system.
 #[derive(Debug, PartialEq)]
 pub struct AppLaunchItem {
     /// The human readable name
     pub name: String,
 
-    /// The target to launch when activating this item.
-    pub target: AppLaunchTarget,
+    /// The URI to launch when activating this item.
+    pub uri: String,
 }
 
 impl ScoreMatchable for AppLaunchItem {
@@ -49,21 +30,16 @@ impl ScoreMatchable for AppLaunchItem {
     /// to the farther to the right a term matches the more specific it was.
     fn match_score<S: AsRef<str>>(&self, terms: &[S]) -> f64 {
         let name = self.name.to_lowercase();
-        let target = match &self.target {
-            AppLaunchTarget::Uri(uri) => uri,
-            AppLaunchTarget::File(file) => file,
-        }
-        .to_lowercase();
+        let uri = self.uri.to_lowercase();
         let name_score = terms.iter().try_fold(0.0, |score, term| {
             name.contains(&term.as_ref().to_lowercase())
                 .then(|| score + 10.0)
                 .ok_or(())
         });
         let target = terms.iter().try_fold(0.0, |score, term| {
-            target
-                .rfind(&term.as_ref().to_lowercase())
+            uri.rfind(&term.as_ref().to_lowercase())
                 .ok_or(())
-                .map(|index| score + 1.0 * (index as f64 / target.len() as f64))
+                .map(|index| score + 1.0 * (index as f64 / uri.len() as f64))
         });
         let score = name_score.unwrap_or_default() + target.unwrap_or_default();
         trace!(

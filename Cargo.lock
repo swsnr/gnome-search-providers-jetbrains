@@ -604,6 +604,7 @@ name = "gnome-search-provider-common"
 version = "0.1.0"
 dependencies = [
  "env_logger",
+ "futures-channel",
  "futures-util",
  "gio",
  "glib",

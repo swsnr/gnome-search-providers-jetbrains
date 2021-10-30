@@ -329,7 +329,7 @@ impl<'a> ItemsSource<AppLaunchItem> for JetbrainsProjectsSource<'a> {
                         id,
                         AppLaunchItem {
                             name,
-                            target: AppLaunchTarget::File(path),
+                            uri: path.to_string(),
                         },
                     );
                 } else {
@@ -394,7 +394,8 @@ async fn start_dbus_service() -> Result<()> {
     glib::MainContext::ref_thread_default().spawn(tick(connection.clone()));
 
     info!("Registering all search providers");
-    let launch_context = create_launch_context(
+    let launch_service = AppLaunchService::new(
+        &glib::MainContext::ref_thread_default(),
         connection.clone(),
         SystemdScopeSettings {
             prefix: concat!("app-", env!("CARGO_BIN_NAME")).to_string(),
@@ -402,8 +403,6 @@ async fn start_dbus_service() -> Result<()> {
             documentation: vec![env!("CARGO_PKG_HOMEPAGE").to_string()],
         },
     );
-    let launch_service =
-        AppLaunchService::new(&glib::MainContext::ref_thread_default(), launch_context);
     register_search_providers(&connection, &launch_service).await?;
 
     info!("All providers registered, acquiring {}", BUSNAME);

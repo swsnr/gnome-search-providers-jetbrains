@@ -139,7 +139,7 @@ impl<S: ItemsSource<AppLaunchItem> + Send + Sync + 'static> AppItemSearchProvide
                     meta.insert("id".to_string(), id.clone().into());
                     meta.insert("name".to_string(), (&item.name).into());
                     meta.insert("gicon".to_string(), self.app.icon().to_string().into());
-                    meta.insert("description".to_string(), item.target.description().into());
+                    meta.insert("description".to_string(), item.uri.clone().into());
                     meta
                 })
             })
@@ -155,27 +155,30 @@ impl<S: ItemsSource<AppLaunchItem> + Send + Sync + 'static> AppItemSearchProvide
     /// The arguments are the result ID, the current search terms and a timestamp.
     ///
     /// Launches the underlying app with the path to the selected item.
-    fn activate_result(&self, id: &str, terms: Vec<&str>, timestamp: u32) -> zbus::fdo::Result<()> {
+    async fn activate_result(
+        &self,
+        id: &str,
+        terms: Vec<&str>,
+        timestamp: u32,
+    ) -> zbus::fdo::Result<()> {
         trace!("Enter ActivateResult({}, {:?}, {})", id, terms, timestamp);
         debug!("Activating result {} for {:?} at {}", id, terms, timestamp);
         let result = if let Some(item) = self.items.get(id) {
             info!("Launching recent item {:?} for {}", item, self.app.id());
             self.launcher
-                .launch(AppLaunchRequest::with_arg(
-                    (*self.app.id()).clone(),
-                    item.target.clone(),
-                ))
+                .launch_uri(self.app.id().clone(), item.uri.clone())
+                .await
                 .map_err(|error| {
                     error!(
                         "Failed to launch app {} for {:?}: {}",
                         self.app.id(),
-                        item.target,
+                        item.uri,
                         error
                     );
                     zbus::fdo::Error::Failed(format!(
                         "Failed to launch app {} for {}: {}",
                         self.app.id(),
-                        item.target.description(),
+                        item.uri,
                         error
                     ))
                 })
@@ -199,12 +202,13 @@ impl<S: ItemsSource<AppLaunchItem> + Send + Sync + 'static> AppItemSearchProvide
     /// The arguments are the current search terms and a timestamp.
     ///
     /// Currently it simply launches the app without any arguments.
-    fn launch_search(&self, terms: Vec<String>, timestamp: u32) -> zbus::fdo::Result<()> {
+    async fn launch_search(&self, terms: Vec<String>, timestamp: u32) -> zbus::fdo::Result<()> {
         trace!("Enter LaunchSearch({:?}, {:?})", terms, timestamp);
         info!("Launching app {} directly", self.app.id());
         let result = self
             .launcher
-            .launch(AppLaunchRequest::without_args((*self.app.id()).clone()))
+            .launch_app(self.app.id().clone())
+            .await
             .map_err(|error| {
                 error!("Failed to launch app {}: {}", self.app.id(), error);
                 zbus::fdo::Error::Failed(format!(
