@@ -22,6 +22,7 @@ use log::{debug, error, info, trace};
 use regex::Regex;
 
 use gnome_search_provider_common::app::*;
+use gnome_search_provider_common::dbus::*;
 use gnome_search_provider_common::gio;
 use gnome_search_provider_common::gio::glib;
 use gnome_search_provider_common::log::*;
@@ -406,8 +407,9 @@ async fn start_dbus_service() -> Result<()> {
     register_search_providers(&connection, &launch_service).await?;
 
     info!("All providers registered, acquiring {}", BUSNAME);
-    connection
-        .request_name(WellKnownName::try_from(BUSNAME).unwrap())
+    // Work around https://gitlab.freedesktop.org/dbus/zbus/-/issues/199,
+    // remove once https://gitlab.freedesktop.org/dbus/zbus/-/merge_requests/414 is merged and released
+    request_name_exclusive(&connection, WellKnownName::try_from(BUSNAME).unwrap())
         .await
         .with_context(|| format!("Failed to request {}", BUSNAME))?;
 

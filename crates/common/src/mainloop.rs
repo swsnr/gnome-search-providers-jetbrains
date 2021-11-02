@@ -8,7 +8,7 @@
 
 use log::{debug, trace};
 
-/// Connect to session bus, acquire the given name on the bus, and start handling messages.
+/// Create a simple main loop on `context`.
 pub fn create_main_loop(context: &glib::MainContext) -> glib::MainLoop {
     let mainloop = glib::MainLoop::new(Some(context), false);
 

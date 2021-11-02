@@ -9,6 +9,7 @@
 #![deny(warnings, missing_docs, clippy::all)]
 
 pub mod app;
+pub mod dbus;
 pub mod log;
 pub mod mainloop;
 pub mod matching;
