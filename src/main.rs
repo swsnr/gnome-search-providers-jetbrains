@@ -44,8 +44,7 @@ struct VersionedPath {
 /// Read paths of all recent projects from the given `reader`.
 fn read_recent_jetbrains_projects<R: Read>(reader: R) -> Result<Vec<String>> {
     let element = Element::from_reader(reader)?;
-    let home = dirs::home_dir()
-        .with_context(|| "$HOME directory required")?
+    let home = glib::home_dir()
         .into_os_string()
         .into_string()
         .ok()
@@ -323,8 +322,10 @@ impl<'a> AsyncItemsSource<AppLaunchItem> for JetbrainsProjectsSource<'a> {
     async fn find_recent_items(&self) -> Result<IdMap<AppLaunchItem>, Self::Err> {
         info!("Searching recent projects for {}", self.app_id);
         let mut items = IndexMap::new();
-        let config_home = dirs::config_dir().unwrap();
-        if let Some(projects_file) = self.config.find_latest_recent_projects_file(&config_home) {
+        if let Some(projects_file) = self
+            .config
+            .find_latest_recent_projects_file(&glib::user_config_dir())
+        {
             for path in read_recent_jetbrains_projects(File::open(projects_file)?)? {
                 if let Some(name) = get_project_name(&path) {
                     trace!("Found project {} at {} for {}", name, path, self.app_id);
@@ -474,8 +475,7 @@ mod tests {
 
     #[test]
     fn versioned_path_extract() {
-        let path = dirs::home_dir()
-            .expect("Must have homedir for test")
+        let path = glib::home_dir()
             .join(".config")
             .join("JetBrains")
             .join("IdeaIC2021.1");
@@ -486,7 +486,7 @@ mod tests {
     #[test]
     fn read_recent_projects() {
         let data: &[u8] = include_bytes!("tests/recentProjects.xml");
-        let home = dirs::home_dir().unwrap();
+        let home = glib::home_dir();
         let items = read_recent_jetbrains_projects(data).unwrap();
 
         assert_eq!(
@@ -509,7 +509,7 @@ mod tests {
     #[test]
     fn read_recent_solutions() {
         let data: &[u8] = include_bytes!("tests/recentSolutions.xml");
-        let home = dirs::home_dir().unwrap();
+        let home = glib::home_dir();
         let items = read_recent_jetbrains_projects(data).unwrap();
 
         assert_eq!(
