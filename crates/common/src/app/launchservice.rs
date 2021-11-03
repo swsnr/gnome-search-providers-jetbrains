@@ -88,6 +88,18 @@ impl TryFrom<&AppId> for gio::DesktopAppInfo {
     }
 }
 
+impl From<String> for AppId {
+    fn from(v: String) -> Self {
+        Self(v)
+    }
+}
+
+impl From<&str> for AppId {
+    fn from(v: &str) -> Self {
+        v.to_string().into()
+    }
+}
+
 impl From<&gio::DesktopAppInfo> for AppId {
     fn from(app: &gio::DesktopAppInfo) -> Self {
         AppId(app.id().unwrap().to_string())

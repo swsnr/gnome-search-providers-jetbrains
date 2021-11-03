@@ -6,7 +6,7 @@
 
 //! Utilities for matching stuff.
 
-use std::fmt::{Debug, Display};
+use std::fmt::Debug;
 
 use log::trace;
 
@@ -64,16 +64,4 @@ where
         terms.iter().map(|s| s.as_ref()).collect::<Vec<&str>>()
     );
     matches.into_iter().map(move |(_, id)| id).collect()
-}
-
-/// A map of IDs to items which can be matched.
-pub type IdMap<I> = IndexMap<String, I>;
-
-/// A trait which denotes a source of matchable items.
-pub trait ItemsSource<T: ScoreMatchable> {
-    /// The error
-    type Err: Display;
-
-    /// Find matchable items.
-    fn find_recent_items(&self) -> Result<IdMap<T>, Self::Err>;
 }

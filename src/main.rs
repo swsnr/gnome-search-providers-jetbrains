@@ -10,12 +10,12 @@
 
 use std::convert::TryFrom;
 use std::ffi::OsStr;
-use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
+use async_trait::async_trait;
 use elementtree::Element;
 use lazy_static::lazy_static;
 use log::{debug, error, info, trace};
@@ -23,11 +23,14 @@ use regex::Regex;
 
 use gnome_search_provider_common::app::*;
 use gnome_search_provider_common::dbus::*;
+use gnome_search_provider_common::futures_channel;
 use gnome_search_provider_common::gio;
 use gnome_search_provider_common::gio::glib;
+use gnome_search_provider_common::gio::prelude::*;
 use gnome_search_provider_common::log::*;
 use gnome_search_provider_common::mainloop::*;
 use gnome_search_provider_common::matching::*;
+use gnome_search_provider_common::source::*;
 use gnome_search_provider_common::zbus;
 use gnome_search_provider_common::zbus::names::WellKnownName;
 
@@ -40,10 +43,9 @@ struct VersionedPath {
 }
 
 /// Read paths of all recent projects from the given `reader`.
-fn read_recent_jetbrains_projects<R: Read>(reader: R) -> Result<Vec<String>> {
+fn parse_recent_jetbrains_projects<R: Read>(reader: R) -> Result<Vec<String>> {
     let element = Element::from_reader(reader)?;
-    let home = dirs::home_dir()
-        .with_context(|| "$HOME directory required")?
+    let home = glib::home_dir()
         .into_os_string()
         .into_string()
         .ok()
@@ -113,41 +115,77 @@ impl VersionedPath {
 struct ConfigLocation<'a> {
     /// The vendor configuration directory.
     vendor_dir: &'a str,
-    /// A glob for configuration directories inside the vendor directory.
-    config_glob: &'a str,
+    /// A prefix for configuration directories inside the vendor directory.
+    config_prefix: &'a str,
     /// The file name for recent projects
     projects_filename: &'a str,
 }
 
 impl ConfigLocation<'_> {
     /// Find the configuration directory of the latest installed product version.
-    fn find_config_dir_of_latest_version(&self, config_home: &Path) -> Option<VersionedPath> {
-        let vendor_dir = config_home.join(self.vendor_dir);
-        let dir = globwalk::GlobWalkerBuilder::new(vendor_dir, self.config_glob)
-            .build()
-            .expect("Failed to build glob pattern")
-            .filter_map(Result::ok)
-            .map(globwalk::DirEntry::into_path)
+    async fn find_config_dir_of_latest_version(&self, config_home: &Path) -> Result<VersionedPath> {
+        let vendor_dir = gio::File::for_path(config_home.join(self.vendor_dir));
+        let files: Vec<gio::FileInfo> = vendor_dir
+            .enumerate_children_async_future(
+                &gio::FILE_ATTRIBUTE_STANDARD_NAME,
+                gio::FileQueryInfoFlags::NONE,
+                glib::PRIORITY_DEFAULT,
+            )
+            .await
+            .with_context(|| format!("Failed to enumerate children of {}", vendor_dir.uri()))?
+            .next_files_async_future(i32::MAX, glib::PRIORITY_DEFAULT)
+            .await
+            .with_context(|| format!("Failed to get children of {}", vendor_dir.uri()))?;
+
+        let dir = files
+            .iter()
+            .filter_map(|f| {
+                f.name()
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .filter(|name| name.starts_with(self.config_prefix))
+                    .map(|_| vendor_dir.path().unwrap().join(f.name()))
+            })
             .filter_map(VersionedPath::extract_version)
             .max_by_key(|p| p.version);
+
         debug!("Found config dir {:?} in {}", dir, config_home.display());
-        dir
+        dir.ok_or_else(|| {
+            anyhow!(
+                "Failed to find configuration directory in {}",
+                config_home.display(),
+            )
+        })
     }
 
     /// Find the latest recent projects file.
-    fn find_latest_recent_projects_file(&self, config_home: &Path) -> Option<PathBuf> {
+    async fn find_latest_recent_projects_file(&self, config_home: &Path) -> Result<PathBuf> {
         let file = self
             .find_config_dir_of_latest_version(config_home)
-            .map(|p| p.into_path())
-            .map(|p| p.join("options").join(self.projects_filename))
-            .filter(|p| p.is_file());
+            .await?
+            .into_path()
+            .join("options")
+            .join(self.projects_filename);
         debug!(
-            "Found recent projects file {:?} in {}",
+            "Using recent projects file at {:?} in {}",
             file,
             config_home.display()
         );
-        file
+        Ok(file)
     }
+}
+
+/// Try to read the name of a Jetbrains project from the `name` file of the given project directory.
+///
+/// Look for a `name` file in the `.idea` sub-directory and return the contents of this file.
+async fn read_name_from_file<P: AsRef<Path>>(path: P) -> Result<String> {
+    let name_file = gio::File::for_path(path.as_ref().join(".idea").join(".name"));
+    trace!("Trying to read name from {}", name_file.uri());
+    let (data, _) = name_file
+        .load_contents_async_future()
+        .await
+        .with_context(|| format!("Failed to read project name from {}", name_file.uri()))?;
+    Ok(String::from_utf8_lossy(&data).trim().to_string())
 }
 
 /// Get the name of the Jetbrains product at the given path.
@@ -155,26 +193,20 @@ impl ConfigLocation<'_> {
 /// Look for a `name` file in the `.idea` sub-directory; if that file does not exist
 /// or cannot be read take the file name of `path`, and ultimately return `None` if
 /// the name cannot be determined.
-fn get_project_name<P: AsRef<Path>>(path: P) -> Option<String> {
-    let name_file = path.as_ref().join(".idea").join(".name");
-    trace!("Trying to read name from {}", name_file.display());
-    File::open(&name_file)
-        .and_then(|mut source| {
-            let mut buffer = String::new();
-            source.read_to_string(&mut buffer)?;
-            trace!("Read project name {} from {}", buffer, name_file.display());
-            Ok(buffer)
-        })
-        .ok()
-        .or_else(|| {
-            trace!(
+async fn get_project_name<P: AsRef<Path>>(path: P) -> Option<String> {
+    match read_name_from_file(path.as_ref()).await {
+        Ok(name) => Some(name),
+        Err(error) => {
+            debug!("Failed to read project name from file: {:#}", error);
+            debug!(
                 "Falling back to file name of {} as project name",
                 path.as_ref().display()
             );
             path.as_ref()
                 .file_name()
                 .map(|name| name.to_string_lossy().to_string())
-        })
+        }
+    }
 }
 
 /// A search provider to expose from this service.
@@ -212,7 +244,7 @@ const PROVIDERS: &[ProviderDefinition] = &[
         relative_obj_path: "toolbox/clion",
         config: ConfigLocation {
             vendor_dir: "JetBrains",
-            config_glob: "CLion*",
+            config_prefix: "CLion",
             projects_filename: "recentProjects.xml",
         },
     },
@@ -222,7 +254,7 @@ const PROVIDERS: &[ProviderDefinition] = &[
         relative_obj_path: "toolbox/goland",
         config: ConfigLocation {
             vendor_dir: "JetBrains",
-            config_glob: "GoLand*",
+            config_prefix: "GoLand",
             projects_filename: "recentProjects.xml",
         },
     },
@@ -232,7 +264,7 @@ const PROVIDERS: &[ProviderDefinition] = &[
         relative_obj_path: "toolbox/idea",
         config: ConfigLocation {
             vendor_dir: "JetBrains",
-            config_glob: "IntelliJIdea*",
+            config_prefix: "IntelliJIdea",
             projects_filename: "recentProjects.xml",
         },
     },
@@ -242,7 +274,7 @@ const PROVIDERS: &[ProviderDefinition] = &[
         relative_obj_path: "toolbox/ideace",
         config: ConfigLocation {
             vendor_dir: "JetBrains",
-            config_glob: "IdeaIC*",
+            config_prefix: "IdeaIC",
             projects_filename: "recentProjects.xml",
         },
     },
@@ -252,7 +284,7 @@ const PROVIDERS: &[ProviderDefinition] = &[
         relative_obj_path: "toolbox/phpstorm",
         config: ConfigLocation {
             vendor_dir: "JetBrains",
-            config_glob: "PhpStorm*",
+            config_prefix: "PhpStorm",
             projects_filename: "recentProjects.xml",
         },
     },
@@ -262,7 +294,7 @@ const PROVIDERS: &[ProviderDefinition] = &[
         relative_obj_path: "toolbox/pycharm",
         config: ConfigLocation {
             vendor_dir: "JetBrains",
-            config_glob: "PyCharm*",
+            config_prefix: "PyCharm",
             projects_filename: "recentProjects.xml",
         },
     },
@@ -272,7 +304,7 @@ const PROVIDERS: &[ProviderDefinition] = &[
         relative_obj_path: "toolbox/rider",
         config: ConfigLocation {
             vendor_dir: "JetBrains",
-            config_glob: "Rider*",
+            config_prefix: "Rider",
             projects_filename: "recentSolutions.xml",
         },
     },
@@ -282,7 +314,7 @@ const PROVIDERS: &[ProviderDefinition] = &[
         relative_obj_path: "toolbox/rubymine",
         config: ConfigLocation {
             vendor_dir: "JetBrains",
-            config_glob: "RubyMine*",
+            config_prefix: "RubyMine",
             projects_filename: "recentProjects.xml",
         },
     },
@@ -292,7 +324,7 @@ const PROVIDERS: &[ProviderDefinition] = &[
         relative_obj_path: "toolbox/studio",
         config: ConfigLocation {
             vendor_dir: "Google",
-            config_glob: "AndroidStudio*",
+            config_prefix: "AndroidStudio",
             projects_filename: "recentProjects.xml",
         },
     },
@@ -302,44 +334,76 @@ const PROVIDERS: &[ProviderDefinition] = &[
         relative_obj_path: "toolbox/webstorm",
         config: ConfigLocation {
             vendor_dir: "JetBrains",
-            config_glob: "WebStorm*",
+            config_prefix: "WebStorm",
             projects_filename: "recentProjects.xml",
         },
     },
 ];
 
 struct JetbrainsProjectsSource<'a> {
-    app_id: String,
+    app_id: AppId,
     /// Where to look for the configuration and the list of recent projects.
     config: &'a ConfigLocation<'a>,
 }
 
-impl<'a> ItemsSource<AppLaunchItem> for JetbrainsProjectsSource<'a> {
+async fn read_recent_items(
+    config: &ConfigLocation<'_>,
+    app_id: AppId,
+) -> Result<IdMap<AppLaunchItem>> {
+    info!("Searching recent projects for {}", app_id);
+    let mut items = IndexMap::new();
+    let projects_file = gio::File::for_path(
+        config
+            .find_latest_recent_projects_file(&glib::user_config_dir())
+            .await?,
+    );
+
+    let (data, _) = projects_file
+        .load_contents_async_future()
+        .await
+        .with_context(|| {
+            format!(
+                "Failed to read recent projects contents from {}",
+                projects_file.uri()
+            )
+        })?;
+
+    for path in parse_recent_jetbrains_projects(&*data)? {
+        if let Some(name) = get_project_name(&path).await {
+            trace!("Found project {} at {} for {}", name, path, app_id);
+            let id = format!("jetbrains-recent-project-{}-{}", app_id, path);
+            items.insert(
+                id,
+                AppLaunchItem {
+                    name,
+                    uri: path.to_string(),
+                },
+            );
+        } else {
+            trace!("Skipping {}, failed to determine project name", path);
+        }
+    }
+    info!("Found {} project(s) for {}", items.len(), app_id);
+    Ok(items)
+}
+
+#[async_trait]
+impl AsyncItemsSource<AppLaunchItem> for JetbrainsProjectsSource<'static> {
     type Err = anyhow::Error;
 
-    fn find_recent_items(&self) -> Result<IdMap<AppLaunchItem>, Self::Err> {
-        info!("Searching recent projects for {}", self.app_id);
-        let mut items = IndexMap::new();
-        let config_home = dirs::config_dir().unwrap();
-        if let Some(projects_file) = self.config.find_latest_recent_projects_file(&config_home) {
-            for path in read_recent_jetbrains_projects(File::open(projects_file)?)? {
-                if let Some(name) = get_project_name(&path) {
-                    trace!("Found project {} at {} for {}", name, path, self.app_id);
-                    let id = format!("jetbrains-recent-project-{}-{}", self.app_id, path);
-                    items.insert(
-                        id,
-                        AppLaunchItem {
-                            name,
-                            uri: path.to_string(),
-                        },
-                    );
-                } else {
-                    trace!("Skipping {}, failed to determine project name", path);
-                }
-            }
-        };
-        info!("Found {} project(s) for {}", items.len(), self.app_id,);
-        Ok(items)
+    async fn find_recent_items(&self) -> Result<IdMap<AppLaunchItem>, Self::Err> {
+        let (send, recv) = futures_channel::oneshot::channel();
+        let app_id = self.app_id.clone();
+        let config = self.config;
+        // Move to the main thread and then asynchronously read recent items through Gio,
+        // and get them sent back to us via a oneshot channel.
+        glib::MainContext::default().invoke(move || {
+            glib::MainContext::default().spawn_local(async move {
+                let result = read_recent_items(config, app_id).await;
+                send.send(result).unwrap();
+            });
+        });
+        recv.await.unwrap()
     }
 }
 
@@ -361,7 +425,7 @@ async fn register_search_providers(
             let dbus_provider = AppItemSearchProvider::new(
                 app.into(),
                 JetbrainsProjectsSource {
-                    app_id: provider.desktop_id.to_string(),
+                    app_id: provider.desktop_id.into(),
                     config: &provider.config,
                 },
                 launch_service.client(),
@@ -455,7 +519,7 @@ Set $RUST_LOG to control the log level",
         context.push_thread_default();
 
         if let Err(error) = context.block_on(start_dbus_service()) {
-            error!("Failed to start DBus server: {}", error);
+            error!("Failed to start DBus server: {:#}", error);
             std::process::exit(1);
         } else {
             create_main_loop(&context).run();
@@ -471,8 +535,7 @@ mod tests {
 
     #[test]
     fn versioned_path_extract() {
-        let path = dirs::home_dir()
-            .expect("Must have homedir for test")
+        let path = glib::home_dir()
             .join(".config")
             .join("JetBrains")
             .join("IdeaIC2021.1");
@@ -483,8 +546,8 @@ mod tests {
     #[test]
     fn read_recent_projects() {
         let data: &[u8] = include_bytes!("tests/recentProjects.xml");
-        let home = dirs::home_dir().unwrap();
-        let items = read_recent_jetbrains_projects(data).unwrap();
+        let home = glib::home_dir();
+        let items = parse_recent_jetbrains_projects(data).unwrap();
 
         assert_eq!(
             items,
@@ -506,8 +569,8 @@ mod tests {
     #[test]
     fn read_recent_solutions() {
         let data: &[u8] = include_bytes!("tests/recentSolutions.xml");
-        let home = dirs::home_dir().unwrap();
-        let items = read_recent_jetbrains_projects(data).unwrap();
+        let home = glib::home_dir();
+        let items = parse_recent_jetbrains_projects(data).unwrap();
 
         assert_eq!(
             items,

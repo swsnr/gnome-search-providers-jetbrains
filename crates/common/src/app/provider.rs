@@ -14,16 +14,17 @@ use zbus::zvariant;
 
 use crate::app::*;
 use crate::matching::*;
+use crate::source::*;
 
 /// A search provider for recent items.
-pub struct AppItemSearchProvider<S: ItemsSource<AppLaunchItem>> {
+pub struct AppItemSearchProvider<S: AsyncItemsSource<AppLaunchItem>> {
     launcher: AppLaunchClient,
     app: App,
     source: S,
     items: IdMap<AppLaunchItem>,
 }
 
-impl<S: ItemsSource<AppLaunchItem>> AppItemSearchProvider<S> {
+impl<S: AsyncItemsSource<AppLaunchItem>> AppItemSearchProvider<S> {
     /// Create a new search provider for recent items of `app`.
     ///
     /// Uses the given `source` to load recent items.
@@ -41,16 +42,16 @@ impl<S: ItemsSource<AppLaunchItem>> AppItemSearchProvider<S> {
 ///
 /// See <https://developer.gnome.org/SearchProvider/> for information.
 #[dbus_interface(name = "org.gnome.Shell.SearchProvider2")]
-impl<S: ItemsSource<AppLaunchItem> + Send + Sync + 'static> AppItemSearchProvider<S> {
+impl<S: AsyncItemsSource<AppLaunchItem> + Send + Sync + 'static> AppItemSearchProvider<S> {
     /// Starts a search.
     ///
     /// This function is called when a new search is started. It gets an array of search terms as arguments,
     /// and should return an array of result IDs. gnome-shell will call GetResultMetas for (some) of these result
     /// IDs to get details about the result that can be be displayed in the result list.
-    fn get_initial_result_set(&mut self, terms: Vec<&str>) -> zbus::fdo::Result<Vec<String>> {
+    async fn get_initial_result_set(&mut self, terms: Vec<&str>) -> zbus::fdo::Result<Vec<String>> {
         trace!("Enter GetInitialResultSet({:?}", &terms);
         debug!("Searching for {:?} of {}", terms, self.app.id());
-        self.items = self.source.find_recent_items().map_err(|error| {
+        self.items = self.source.find_recent_items().await.map_err(|error| {
             error!(
                 "Failed to update recent items for {}: {:#}",
                 self.app.id(),

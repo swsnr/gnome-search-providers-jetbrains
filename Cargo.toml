@@ -14,19 +14,19 @@ edition = "2018"
 publish = false
 
 [dependencies]
-globwalk = "^0.8"
 regex = "^1.4"
 lazy_static = "^1.4"
-dirs = "^4.0"
 elementtree = "^0.5"
 anyhow = "^1.0"
 log = { version = "^0.4", features = ["release_max_level_info"] }
 clap = { version = "^2.33", default-features = false }
 gnome-search-provider-common = { path = "./crates/common" }
+async-trait = "^0.1"
 
 [dev-dependencies]
 pretty_assertions = "^1"
 rust-ini = "^0.17"
+globwalk = "^0.8"
 
 [workspace]
 members = ["./crates/common"]
