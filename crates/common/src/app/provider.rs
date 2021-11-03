@@ -14,6 +14,7 @@ use zbus::zvariant;
 
 use crate::app::*;
 use crate::matching::*;
+use crate::source::*;
 
 /// A search provider for recent items.
 pub struct AppItemSearchProvider<S: ItemsSource<AppLaunchItem>> {

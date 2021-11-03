@@ -13,6 +13,7 @@ pub mod dbus;
 pub mod log;
 pub mod mainloop;
 pub mod matching;
+pub mod source;
 
 mod systemd;
 

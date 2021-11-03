@@ -28,6 +28,7 @@ use gnome_search_provider_common::gio::glib;
 use gnome_search_provider_common::log::*;
 use gnome_search_provider_common::mainloop::*;
 use gnome_search_provider_common::matching::*;
+use gnome_search_provider_common::source::*;
 use gnome_search_provider_common::zbus;
 use gnome_search_provider_common::zbus::names::WellKnownName;
 
