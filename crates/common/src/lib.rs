@@ -17,7 +17,9 @@ pub mod source;
 
 mod systemd;
 
-/// Re-exports.
+// Re-exports.
+
+pub use futures_channel;
 pub use futures_util;
 pub use gio;
 pub use glib;
