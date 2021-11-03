@@ -132,10 +132,10 @@ impl ConfigLocation<'_> {
                 glib::PRIORITY_DEFAULT,
             )
             .await
-            .with_context(|| format!("Failed to enumerate children of {}", vendor_dir))?
+            .with_context(|| format!("Failed to enumerate children of {}", vendor_dir.uri()))?
             .next_files_async_future(i32::MAX, glib::PRIORITY_DEFAULT)
             .await
-            .with_context(|| format!("Failed to get children of {}", vendor_dir))?;
+            .with_context(|| format!("Failed to get children of {}", vendor_dir.uri()))?;
 
         let dir = files
             .iter()
@@ -364,7 +364,7 @@ async fn read_recent_items(
         .with_context(|| {
             format!(
                 "Failed to read recent projects contents from {}",
-                projects_file
+                projects_file.uri()
             )
         })?;
 
@@ -519,7 +519,7 @@ Set $RUST_LOG to control the log level",
         context.push_thread_default();
 
         if let Err(error) = context.block_on(start_dbus_service()) {
-            error!("Failed to start DBus server: {}", error);
+            error!("Failed to start DBus server: {:#}", error);
             std::process::exit(1);
         } else {
             create_main_loop(&context).run();
