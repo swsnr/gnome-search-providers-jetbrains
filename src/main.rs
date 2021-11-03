@@ -10,7 +10,6 @@
 
 use std::convert::TryFrom;
 use std::ffi::OsStr;
-use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
@@ -44,7 +43,7 @@ struct VersionedPath {
 }
 
 /// Read paths of all recent projects from the given `reader`.
-fn read_recent_jetbrains_projects<R: Read>(reader: R) -> Result<Vec<String>> {
+fn parse_recent_jetbrains_projects<R: Read>(reader: R) -> Result<Vec<String>> {
     let element = Element::from_reader(reader)?;
     let home = glib::home_dir()
         .into_os_string()
@@ -176,31 +175,38 @@ impl ConfigLocation<'_> {
     }
 }
 
+/// Try to read the name of a Jetbrains project from the `name` file of the given project directory.
+///
+/// Look for a `name` file in the `.idea` sub-directory and return the contents of this file.
+async fn read_name_from_file<P: AsRef<Path>>(path: P) -> Result<String> {
+    let name_file = gio::File::for_path(path.as_ref().join(".idea").join(".name"));
+    trace!("Trying to read name from {}", name_file.uri());
+    let (data, _) = name_file
+        .load_contents_async_future()
+        .await
+        .with_context(|| format!("Failed to read project name from {}", name_file.uri()))?;
+    Ok(String::from_utf8_lossy(&data).trim().to_string())
+}
+
 /// Get the name of the Jetbrains product at the given path.
 ///
 /// Look for a `name` file in the `.idea` sub-directory; if that file does not exist
 /// or cannot be read take the file name of `path`, and ultimately return `None` if
 /// the name cannot be determined.
-fn get_project_name<P: AsRef<Path>>(path: P) -> Option<String> {
-    let name_file = path.as_ref().join(".idea").join(".name");
-    trace!("Trying to read name from {}", name_file.display());
-    File::open(&name_file)
-        .and_then(|mut source| {
-            let mut buffer = String::new();
-            source.read_to_string(&mut buffer)?;
-            trace!("Read project name {} from {}", buffer, name_file.display());
-            Ok(buffer)
-        })
-        .ok()
-        .or_else(|| {
-            trace!(
+async fn get_project_name<P: AsRef<Path>>(path: P) -> Option<String> {
+    match read_name_from_file(path.as_ref()).await {
+        Ok(name) => Some(name),
+        Err(error) => {
+            debug!("Failed to read project name from file: {:#}", error);
+            debug!(
                 "Falling back to file name of {} as project name",
                 path.as_ref().display()
             );
             path.as_ref()
                 .file_name()
                 .map(|name| name.to_string_lossy().to_string())
-        })
+        }
+    }
 }
 
 /// A search provider to expose from this service.
@@ -346,12 +352,24 @@ async fn read_recent_items(
 ) -> Result<IdMap<AppLaunchItem>> {
     info!("Searching recent projects for {}", app_id);
     let mut items = IndexMap::new();
-    let projects_file = config
-        .find_latest_recent_projects_file(&glib::user_config_dir())
-        .await?;
+    let projects_file = gio::File::for_path(
+        config
+            .find_latest_recent_projects_file(&glib::user_config_dir())
+            .await?,
+    );
 
-    for path in read_recent_jetbrains_projects(File::open(projects_file)?)? {
-        if let Some(name) = get_project_name(&path) {
+    let (data, _) = projects_file
+        .load_contents_async_future()
+        .await
+        .with_context(|| {
+            format!(
+                "Failed to read recent projects contents from {}",
+                projects_file
+            )
+        })?;
+
+    for path in parse_recent_jetbrains_projects(&*data)? {
+        if let Some(name) = get_project_name(&path).await {
             trace!("Found project {} at {} for {}", name, path, app_id);
             let id = format!("jetbrains-recent-project-{}-{}", app_id, path);
             items.insert(
@@ -529,7 +547,7 @@ mod tests {
     fn read_recent_projects() {
         let data: &[u8] = include_bytes!("tests/recentProjects.xml");
         let home = glib::home_dir();
-        let items = read_recent_jetbrains_projects(data).unwrap();
+        let items = parse_recent_jetbrains_projects(data).unwrap();
 
         assert_eq!(
             items,
@@ -552,7 +570,7 @@ mod tests {
     fn read_recent_solutions() {
         let data: &[u8] = include_bytes!("tests/recentSolutions.xml");
         let home = glib::home_dir();
-        let items = read_recent_jetbrains_projects(data).unwrap();
+        let items = parse_recent_jetbrains_projects(data).unwrap();
 
         assert_eq!(
             items,
