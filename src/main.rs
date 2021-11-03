@@ -16,6 +16,7 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use anyhow::{Context, Result};
+use async_trait::async_trait;
 use elementtree::Element;
 use lazy_static::lazy_static;
 use log::{debug, error, info, trace};
@@ -315,10 +316,11 @@ struct JetbrainsProjectsSource<'a> {
     config: &'a ConfigLocation<'a>,
 }
 
-impl<'a> ItemsSource<AppLaunchItem> for JetbrainsProjectsSource<'a> {
+#[async_trait]
+impl<'a> AsyncItemsSource<AppLaunchItem> for JetbrainsProjectsSource<'a> {
     type Err = anyhow::Error;
 
-    fn find_recent_items(&self) -> Result<IdMap<AppLaunchItem>, Self::Err> {
+    async fn find_recent_items(&self) -> Result<IdMap<AppLaunchItem>, Self::Err> {
         info!("Searching recent projects for {}", self.app_id);
         let mut items = IndexMap::new();
         let config_home = dirs::config_dir().unwrap();

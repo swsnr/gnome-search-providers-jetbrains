@@ -8,6 +8,7 @@
 
 use std::fmt::Display;
 
+use async_trait::async_trait;
 use indexmap::map::IndexMap;
 
 use crate::matching::ScoreMatchable;
@@ -15,11 +16,12 @@ use crate::matching::ScoreMatchable;
 /// A map of IDs to items which can be matched.
 pub type IdMap<I> = IndexMap<String, I>;
 
-/// A trait which denotes a source of matchable items.
-pub trait ItemsSource<T: ScoreMatchable> {
+/// A async source for matchable items.
+#[async_trait]
+pub trait AsyncItemsSource<T: ScoreMatchable> {
     /// The error
     type Err: Display;
 
     /// Find matchable items.
-    fn find_recent_items(&self) -> Result<IdMap<T>, Self::Err>;
+    async fn find_recent_items(&self) -> Result<IdMap<T>, Self::Err>;
 }

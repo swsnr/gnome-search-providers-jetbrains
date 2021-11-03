@@ -603,6 +603,7 @@ dependencies = [
 name = "gnome-search-provider-common"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "env_logger",
  "futures-channel",
  "futures-util",
@@ -622,6 +623,7 @@ name = "gnome-search-providers-jetbrains"
 version = "1.7.2-alpha.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "clap",
  "dirs",
  "elementtree",
