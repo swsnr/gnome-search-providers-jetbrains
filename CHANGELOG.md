@@ -6,6 +6,9 @@ and this project doesn't really care for versioning.
 
 ## [Unreleased]
 
+### Changed
+- Make internal async, to account for changes in zbus' APIs and to hopefully speed up things a bit.
+
 ## [1.7.1] – 2021-09-08
 
 ### Fixed
