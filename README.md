@@ -21,7 +21,7 @@ Supports
 
 Under the hood this is a small systemd user service which implements the [search provider][1] DBus API and exposes recent projects from Jetbrains IDEs.
 
-[1]: https://developer.gnome.org/SearchProvider/
+[1]: https://developer.gnome.org/SearchProvider/documentation/tutorials/search-provider.html
 
 ## Installation
 
