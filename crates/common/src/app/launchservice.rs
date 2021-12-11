@@ -149,7 +149,7 @@ struct AppLaunchRequest {
 /// A service which launches apps on a glib main context.
 #[derive(Debug)]
 pub struct AppLaunchService {
-    source: glib::SourceId,
+    source: Option<glib::SourceId>,
     send: glib::Sender<AppLaunchRequest>,
 }
 
@@ -250,13 +250,13 @@ impl AppLaunchService {
             }),
         );
 
-        let source = recv.attach(
+        let source = Some(recv.attach(
             Some(main_context),
             glib::clone!(@strong main_context => move |request: AppLaunchRequest| {
                 handle_launch(main_context.clone(), launch_context.clone(), request);
                 glib::Continue(true)
             }),
-        );
+        ));
         AppLaunchService { source, send }
     }
 
@@ -264,6 +264,14 @@ impl AppLaunchService {
     pub fn client(&self) -> AppLaunchClient {
         AppLaunchClient {
             send: self.send.clone(),
+        }
+    }
+}
+
+impl Drop for AppLaunchService {
+    fn drop(&mut self) {
+        if let Some(source_id) = self.source.take() {
+            glib::source_remove(source_id)
         }
     }
 }
