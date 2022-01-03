@@ -19,7 +19,7 @@ lazy_static = "^1.4"
 elementtree = "^0.5"
 anyhow = "^1.0"
 log = { version = "^0.4", features = ["release_max_level_info"] }
-clap = { version = "^2.33", default-features = false }
+clap = { version = "^3", default-features = false, features=["std", "cargo"] }
 gnome-search-provider-common = { path = "./crates/common" }
 async-trait = "^0.1"
 
