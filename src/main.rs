@@ -22,7 +22,6 @@ use log::{debug, error, info, trace};
 use regex::Regex;
 
 use gnome_search_provider_common::app::*;
-use gnome_search_provider_common::dbus::*;
 use gnome_search_provider_common::futures_channel;
 use gnome_search_provider_common::gio;
 use gnome_search_provider_common::gio::glib;
@@ -414,7 +413,6 @@ async fn register_search_providers(
     connection: &zbus::Connection,
     launch_service: &AppLaunchService,
 ) -> Result<()> {
-    let mut object_server = connection.object_server_mut().await;
     for provider in PROVIDERS {
         if let Some(app) = gio::DesktopAppInfo::new(provider.desktop_id) {
             info!(
@@ -430,7 +428,10 @@ async fn register_search_providers(
                 },
                 launch_service.client(),
             );
-            object_server.at(provider.objpath().as_str(), dbus_provider)?;
+            connection
+                .object_server()
+                .at(provider.objpath().as_str(), dbus_provider)
+                .await?;
         }
     }
     Ok(())
@@ -471,9 +472,8 @@ async fn start_dbus_service() -> Result<()> {
     register_search_providers(&connection, &launch_service).await?;
 
     info!("All providers registered, acquiring {}", BUSNAME);
-    // Work around https://gitlab.freedesktop.org/dbus/zbus/-/issues/199,
-    // remove once https://gitlab.freedesktop.org/dbus/zbus/-/merge_requests/414 is merged and released
-    request_name_exclusive(&connection, WellKnownName::try_from(BUSNAME).unwrap())
+    connection
+        .request_name(WellKnownName::try_from(BUSNAME).unwrap())
         .await
         .with_context(|| format!("Failed to request {}", BUSNAME))?;
 
