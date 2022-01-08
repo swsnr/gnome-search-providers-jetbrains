@@ -8,7 +8,6 @@
 
 //! Gnome search provider for Jetbrains products
 
-use std::convert::TryFrom;
 use std::ffi::OsStr;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -31,7 +30,6 @@ use gnome_search_provider_common::mainloop::*;
 use gnome_search_provider_common::matching::*;
 use gnome_search_provider_common::source::*;
 use gnome_search_provider_common::zbus;
-use gnome_search_provider_common::zbus::names::WellKnownName;
 
 /// A path with an associated version.
 #[derive(Debug)]
@@ -409,34 +407,6 @@ impl AsyncItemsSource<AppLaunchItem> for JetbrainsProjectsSource<'static> {
 /// The name to request on the bus.
 const BUSNAME: &str = "de.swsnr.searchprovider.Jetbrains";
 
-async fn register_search_providers(
-    connection: &zbus::Connection,
-    launch_service: &AppLaunchService,
-) -> Result<()> {
-    for provider in PROVIDERS {
-        if let Some(app) = gio::DesktopAppInfo::new(provider.desktop_id) {
-            info!(
-                "Registering provider for {} at {}",
-                provider.desktop_id,
-                provider.objpath()
-            );
-            let dbus_provider = AppItemSearchProvider::new(
-                app.into(),
-                JetbrainsProjectsSource {
-                    app_id: provider.desktop_id.into(),
-                    config: &provider.config,
-                },
-                launch_service.client(),
-            );
-            connection
-                .object_server()
-                .at(provider.objpath().as_str(), dbus_provider)
-                .await?;
-        }
-    }
-    Ok(())
-}
-
 async fn tick(connection: zbus::Connection) {
     loop {
         connection.executor().tick().await
@@ -448,7 +418,7 @@ async fn tick(connection: zbus::Connection) {
 struct Service {
     /// The launch service used to launch applications.
     launch_service: AppLaunchService,
-    /// The connection this service runs on.
+    /// The DBus connection of this service.
     connection: zbus::Connection,
 }
 
@@ -460,23 +430,56 @@ struct Service {
 /// Then register the connection on the Glib main loop and install a callback to
 /// handle incoming messages.
 async fn start_dbus_service() -> Result<Service> {
-    let connection = zbus::ConnectionBuilder::session()?
+    let launch_service = AppLaunchService::new();
+    // Create search providers for all apps we find
+    let providers = PROVIDERS
+        .iter()
+        .filter_map(|provider| {
+            gio::DesktopAppInfo::new(provider.desktop_id).map(|app| {
+                info!("Found app {}", provider.desktop_id);
+                (
+                    provider.objpath(),
+                    AppItemSearchProvider::new(
+                        app.into(),
+                        JetbrainsProjectsSource {
+                            app_id: provider.desktop_id.into(),
+                            config: &provider.config,
+                        },
+                        launch_service.client(),
+                    ),
+                )
+            })
+        })
+        .collect::<Vec<_>>();
+
+    info!(
+        "Registering {} search provider(s) on {}",
+        providers.len(),
+        BUSNAME
+    );
+    let connection = providers
+        .into_iter()
+        .try_fold(
+            zbus::ConnectionBuilder::session()?,
+            |b, (path, provider)| {
+                debug!(
+                    "Serving search provider for app {} at {}",
+                    provider.app().id(),
+                    path
+                );
+                b.serve_at(path, provider)
+            },
+        )?
+        .name(BUSNAME)?
+        // We disable the internal executor because we'd like to run the connection
+        // exclusively on the glib mainloop, and thus tick it manually (see below).
         .internal_executor(false)
         .build()
         .await
         .with_context(|| "Failed to connect to session bus")?;
 
+    // Manually tick the connection on the glib mainloop to make all code in zbus run on the mainloop.
     glib::MainContext::ref_thread_default().spawn(tick(connection.clone()));
-
-    info!("Registering all search providers");
-    let launch_service = AppLaunchService::new();
-    register_search_providers(&connection, &launch_service).await?;
-
-    info!("All providers registered, acquiring {}", BUSNAME);
-    connection
-        .request_name(WellKnownName::try_from(BUSNAME).unwrap())
-        .await
-        .with_context(|| format!("Failed to request {}", BUSNAME))?;
 
     info!("Acquired name {}, serving search providers", BUSNAME);
     Ok(Service {
@@ -525,9 +528,6 @@ fn main() {
 
         match context.block_on(start_dbus_service()) {
             Ok(service) => {
-                // Discard the client because we don't need to create any further clients,
-                // and discard the source because we'll never remove it until the main loop
-                // exits.
                 let _ = service.launch_service.start(
                     &context,
                     service.connection.clone(),

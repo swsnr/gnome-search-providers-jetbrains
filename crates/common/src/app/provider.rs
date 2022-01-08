@@ -25,6 +25,13 @@ pub struct AppItemSearchProvider<S: AsyncItemsSource<AppLaunchItem>> {
 }
 
 impl<S: AsyncItemsSource<AppLaunchItem>> AppItemSearchProvider<S> {
+    /// The app managed by this search provider.
+    pub fn app(&self) -> &App {
+        &self.app
+    }
+}
+
+impl<S: AsyncItemsSource<AppLaunchItem>> AppItemSearchProvider<S> {
     /// Create a new search provider for recent items of `app`.
     ///
     /// Uses the given `source` to load recent items.
