@@ -530,7 +530,7 @@ fn main() {
             Ok(service) => {
                 let _ = service.launch_service.start(
                     &context,
-                    service.connection.clone(),
+                    service.connection,
                     SystemdScopeSettings {
                         prefix: concat!("app-", env!("CARGO_BIN_NAME")).to_string(),
                         started_by: env!("CARGO_BIN_NAME").to_string(),
