@@ -271,6 +271,10 @@ impl AppLaunchService {
 impl Drop for AppLaunchService {
     fn drop(&mut self) {
         if let Some(source_id) = self.source.take() {
+            trace!(
+                "Removing source {:?} while dropping launch service",
+                source_id
+            );
             glib::source_remove(source_id)
         }
     }

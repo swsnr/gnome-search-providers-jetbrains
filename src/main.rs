@@ -443,6 +443,14 @@ async fn tick(connection: zbus::Connection) {
     }
 }
 
+/// The running service.
+#[derive(Debug)]
+struct Service {
+    /// The launch service used to launch applications.
+    #[allow(unused)]
+    launch_service: AppLaunchService,
+}
+
 /// Starts the DBUS service.
 ///
 /// Connect to the session bus and register a new DBus object for every provider
@@ -450,7 +458,7 @@ async fn tick(connection: zbus::Connection) {
 ///
 /// Then register the connection on the Glib main loop and install a callback to
 /// handle incoming messages.
-async fn start_dbus_service() -> Result<()> {
+async fn start_dbus_service() -> Result<Service> {
     let connection = zbus::ConnectionBuilder::session()?
         .internal_executor(false)
         .build()
@@ -478,7 +486,7 @@ async fn start_dbus_service() -> Result<()> {
         .with_context(|| format!("Failed to request {}", BUSNAME))?;
 
     info!("Acquired name {}, serving search providers", BUSNAME);
-    Ok(())
+    Ok(Service { launch_service })
 }
 
 fn app() -> clap::App<'static> {
@@ -519,11 +527,16 @@ fn main() {
         let context = glib::MainContext::default();
         context.push_thread_default();
 
-        if let Err(error) = context.block_on(start_dbus_service()) {
-            error!("Failed to start DBus server: {:#}", error);
-            std::process::exit(1);
-        } else {
-            create_main_loop(&context).run();
+        match context.block_on(start_dbus_service()) {
+            Ok(service) => {
+                create_main_loop(&context).run();
+                // Make sure that the entire service is alive until the mainloop exists
+                drop(service);
+            }
+            Err(error) => {
+                error!("Failed to start DBus server: {:#}", error);
+                std::process::exit(1);
+            }
         }
     }
 }
