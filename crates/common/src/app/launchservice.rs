@@ -11,6 +11,7 @@ use std::fmt::{Display, Formatter};
 use std::sync::Arc;
 
 use gio::prelude::*;
+use glib::SourceId;
 // use glib::clone;
 use libc::pid_t;
 use log::{debug, error, info, trace, warn};
@@ -146,13 +147,6 @@ struct AppLaunchRequest {
     response: futures_channel::oneshot::Sender<Result<(), glib::Error>>,
 }
 
-/// A service which launches apps on a glib main context.
-#[derive(Debug)]
-pub struct AppLaunchService {
-    source: Option<glib::SourceId>,
-    send: glib::Sender<AppLaunchRequest>,
-}
-
 async fn launch_app(
     context: &gio::AppLaunchContext,
     app_id: &AppId,
@@ -222,16 +216,51 @@ fn handle_launch(
     });
 }
 
+/// A service which launches apps on a glib main context.
+///
+/// A launch service receives requests to launch apps from launch service clients.
+///
+/// For each request it then starts an instance of the app with the given URI if any,
+/// and moves the new process into a dedicated systemd scope to isolate it.
+#[derive(Debug)]
+pub struct AppLaunchService {
+    recv: glib::Receiver<AppLaunchRequest>,
+    send: glib::Sender<AppLaunchRequest>,
+}
+
+impl Default for AppLaunchService {
+    fn default() -> Self {
+        let (send, recv) = glib::MainContext::channel(glib::Priority::default());
+        AppLaunchService { send, recv }
+    }
+}
+
 impl AppLaunchService {
     /// Create a new launch service.
-    pub fn new(
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Start this app launch service.
+    ///
+    /// `main_context` denotes the context on which to receive launch requests.
+    /// `connection` is the DBus connection to use for talking to systemd in order to
+    /// create new scopes for started instances.  `scope_settings` denotes the how
+    /// these scopes should be set up.
+    ///
+    /// Consumes `self` in order to avoid starting a service twice.  Returns the client side
+    /// of this service and the glib source ID which refers to the running service.
+    ///
+    /// To attach further clients simply clone the returned client.  To stop the service use
+    /// [`glib::remove_source`] on the returned source ID.
+    #[must_use]
+    pub fn start(
+        self,
         main_context: &glib::MainContext,
         connection: zbus::Connection,
         scope_settings: SystemdScopeSettings,
-    ) -> Self {
+    ) -> (AppLaunchClient, SourceId) {
         let scope_settings_arc = Arc::new(scope_settings);
-        let (send, recv) = glib::MainContext::channel(glib::Priority::default());
-
         let launch_context = gio::AppLaunchContext::new();
         launch_context.connect_launched(
             glib::clone!(@strong main_context => move |_, app, platform_data| {
@@ -250,14 +279,15 @@ impl AppLaunchService {
             }),
         );
 
-        let source = Some(recv.attach(
+        let client = self.client();
+        let source = self.recv.attach(
             Some(main_context),
             glib::clone!(@strong main_context => move |request: AppLaunchRequest| {
                 handle_launch(main_context.clone(), launch_context.clone(), request);
                 glib::Continue(true)
             }),
-        ));
-        AppLaunchService { source, send }
+        );
+        (client, source)
     }
 
     /// Create a new client for this launch service.
@@ -268,19 +298,9 @@ impl AppLaunchService {
     }
 }
 
-impl Drop for AppLaunchService {
-    fn drop(&mut self) {
-        if let Some(source_id) = self.source.take() {
-            trace!(
-                "Removing source {:?} while dropping launch service",
-                source_id
-            );
-            glib::source_remove(source_id)
-        }
-    }
-}
-
 /// A client for a launch service.
+///
+/// Clients can be cloned cheaply to create a new separate client.
 #[derive(Debug, Clone)]
 pub struct AppLaunchClient {
     send: glib::Sender<AppLaunchRequest>,

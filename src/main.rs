@@ -447,8 +447,9 @@ async fn tick(connection: zbus::Connection) {
 #[derive(Debug)]
 struct Service {
     /// The launch service used to launch applications.
-    #[allow(unused)]
     launch_service: AppLaunchService,
+    /// The connection this service runs on.
+    connection: zbus::Connection,
 }
 
 /// Starts the DBUS service.
@@ -468,15 +469,7 @@ async fn start_dbus_service() -> Result<Service> {
     glib::MainContext::ref_thread_default().spawn(tick(connection.clone()));
 
     info!("Registering all search providers");
-    let launch_service = AppLaunchService::new(
-        &glib::MainContext::ref_thread_default(),
-        connection.clone(),
-        SystemdScopeSettings {
-            prefix: concat!("app-", env!("CARGO_BIN_NAME")).to_string(),
-            started_by: env!("CARGO_BIN_NAME").to_string(),
-            documentation: vec![env!("CARGO_PKG_HOMEPAGE").to_string()],
-        },
-    );
+    let launch_service = AppLaunchService::new();
     register_search_providers(&connection, &launch_service).await?;
 
     info!("All providers registered, acquiring {}", BUSNAME);
@@ -486,7 +479,10 @@ async fn start_dbus_service() -> Result<Service> {
         .with_context(|| format!("Failed to request {}", BUSNAME))?;
 
     info!("Acquired name {}, serving search providers", BUSNAME);
-    Ok(Service { launch_service })
+    Ok(Service {
+        launch_service,
+        connection,
+    })
 }
 
 fn app() -> clap::App<'static> {
@@ -529,9 +525,19 @@ fn main() {
 
         match context.block_on(start_dbus_service()) {
             Ok(service) => {
+                // Discard the client because we don't need to create any further clients,
+                // and discard the source because we'll never remove it until the main loop
+                // exits.
+                let _ = service.launch_service.start(
+                    &context,
+                    service.connection.clone(),
+                    SystemdScopeSettings {
+                        prefix: concat!("app-", env!("CARGO_BIN_NAME")).to_string(),
+                        started_by: env!("CARGO_BIN_NAME").to_string(),
+                        documentation: vec![env!("CARGO_PKG_HOMEPAGE").to_string()],
+                    },
+                );
                 create_main_loop(&context).run();
-                // Make sure that the entire service is alive until the mainloop exists
-                drop(service);
             }
             Err(error) => {
                 error!("Failed to start DBus server: {:#}", error);
