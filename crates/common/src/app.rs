@@ -6,7 +6,7 @@
 
 //! Apps and their recent items.
 
-use log::{debug, error, info, trace};
+use tracing::{debug, error, info};
 
 mod item;
 mod launchservice;

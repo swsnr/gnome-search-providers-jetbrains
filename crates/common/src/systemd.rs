@@ -8,7 +8,7 @@
 
 use libc::pid_t;
 use libsystemd::unit::escape_name;
-use log::{debug, trace};
+use tracing::{debug, trace};
 use zbus::dbus_proxy;
 use zbus::zvariant::{OwnedObjectPath, Value};
 

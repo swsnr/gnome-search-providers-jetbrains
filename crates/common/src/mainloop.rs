@@ -6,7 +6,7 @@
 
 //! Mainloop utilities for dbus serch providers.
 
-use log::{debug, trace};
+use tracing::{debug, trace};
 
 /// Create a simple main loop on `context`.
 pub fn create_main_loop(context: &glib::MainContext) -> glib::MainLoop {

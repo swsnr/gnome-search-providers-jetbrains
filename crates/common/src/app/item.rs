@@ -7,7 +7,8 @@
 //! Items to be launch by an app.
 
 use crate::matching::ScoreMatchable;
-use log::trace;
+use tracing::field;
+use tracing::{instrument, trace};
 
 /// A recent item from the file system.
 #[derive(Debug, PartialEq)]
@@ -28,6 +29,7 @@ impl ScoreMatchable for AppLaunchItem {
     /// If all terms match the target each term contributes 1 to score, scaled by the relative position
     /// of the right-most match, assuming that paths typically go from least to most specific segment,
     /// to the farther to the right a term matches the more specific it was.
+    #[instrument(skip(terms), fields(terms = field::debug(terms.iter().map(|s| s.as_ref()).collect::<Vec<&str>>())))]
     fn match_score<S: AsRef<str>>(&self, terms: &[S]) -> f64 {
         let name = self.name.to_lowercase();
         let uri = self.uri.to_lowercase();

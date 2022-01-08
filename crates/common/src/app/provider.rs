@@ -7,8 +7,11 @@
 //! Search providers for apps.
 
 use std::collections::HashMap;
+use std::fmt::Debug;
 
 use indexmap::IndexMap;
+use tracing::field;
+use tracing::instrument;
 use zbus::dbus_interface;
 use zbus::zvariant;
 
@@ -17,6 +20,7 @@ use crate::matching::*;
 use crate::source::*;
 
 /// A search provider for recent items.
+#[derive(Debug)]
 pub struct AppItemSearchProvider<S: AsyncItemsSource<AppLaunchItem>> {
     launcher: AppLaunchClient,
     app: App,
@@ -55,8 +59,8 @@ impl<S: AsyncItemsSource<AppLaunchItem> + Send + Sync + 'static> AppItemSearchPr
     /// This function is called when a new search is started. It gets an array of search terms as arguments,
     /// and should return an array of result IDs. gnome-shell will call GetResultMetas for (some) of these result
     /// IDs to get details about the result that can be be displayed in the result list.
+    #[instrument(skip(self), fields(app_id = field::debug(self.app.id())))]
     async fn get_initial_result_set(&mut self, terms: Vec<&str>) -> zbus::fdo::Result<Vec<String>> {
-        trace!("Enter GetInitialResultSet({:?}", &terms);
         debug!("Searching for {:?} of {}", terms, self.app.id());
         self.items = self.source.find_recent_items().await.map_err(|error| {
             error!(
@@ -76,7 +80,6 @@ impl<S: AsyncItemsSource<AppLaunchItem> + Send + Sync + 'static> AppItemSearchPr
             .map(String::to_owned)
             .collect();
         debug!("Found ids {:?} for {}", ids, self.app.id());
-        trace!("GetInitialResultSet({:?} -> {:?}", &terms, &ids);
         Ok(ids)
     }
 
@@ -85,16 +88,12 @@ impl<S: AsyncItemsSource<AppLaunchItem> + Send + Sync + 'static> AppItemSearchPr
     /// This function is called to refine the initial search results when the user types more characters in the search entry.
     /// It gets the previous search results and the current search terms as arguments, and should return an array of result IDs,
     /// just like GetInitialResultSet.
+    #[instrument(skip(self), fields(app_id = field::debug(self.app.id())))]
     fn get_subsearch_result_set(
         &self,
         previous_results: Vec<&str>,
         terms: Vec<&str>,
     ) -> Vec<String> {
-        trace!(
-            "Enter GetSubsearchResultSet({:?}, {:?})",
-            previous_results,
-            terms
-        );
         debug!(
             "Searching for {:?} in {:?} of {}",
             terms,
@@ -110,12 +109,6 @@ impl<S: AsyncItemsSource<AppLaunchItem> + Send + Sync + 'static> AppItemSearchPr
             .map(|s| s.to_owned())
             .collect();
         debug!("Found ids {:?} for {}", ids, self.app.id());
-        trace!(
-            "GetSubsearchResultSet({:?}, {:?}) -> {:?}",
-            previous_results,
-            terms,
-            ids
-        );
         ids
     }
 
@@ -133,8 +126,8 @@ impl<S: AsyncItemsSource<AppLaunchItem> + Send + Sync + 'static> AppItemSearchPr
     //  - "gicon": a textual representation of a GIcon (see g_icon_to_string()), or alternatively,
     //  - "icon-data": a tuple of type (iiibiiay) describing a pixbuf with width, height, rowstride, has-alpha, bits-per-sample, and image data
     //  - "description": an optional short description (1-2 lines)
+    #[instrument(skip(self), fields(app_id = field::debug(self.app.id())))]
     fn get_result_metas(&self, results: Vec<String>) -> Vec<HashMap<String, zvariant::Value>> {
-        trace!("Enter GetResultMetas({:?}", results);
         debug!("Getting meta info for {:?}", results);
         let metas = results
             .iter()
@@ -153,7 +146,7 @@ impl<S: AsyncItemsSource<AppLaunchItem> + Send + Sync + 'static> AppItemSearchPr
             })
             .collect();
 
-        trace!("GetResultMetas({:?}) -> {:?}", results, &metas);
+        debug!("Return meta info {:?}", &metas);
         metas
     }
 
@@ -163,15 +156,15 @@ impl<S: AsyncItemsSource<AppLaunchItem> + Send + Sync + 'static> AppItemSearchPr
     /// The arguments are the result ID, the current search terms and a timestamp.
     ///
     /// Launches the underlying app with the path to the selected item.
+    #[instrument(skip(self), fields(app_id = field::debug(self.app.id())))]
     async fn activate_result(
         &self,
         id: &str,
         terms: Vec<&str>,
         timestamp: u32,
     ) -> zbus::fdo::Result<()> {
-        trace!("Enter ActivateResult({}, {:?}, {})", id, terms, timestamp);
         debug!("Activating result {} for {:?} at {}", id, terms, timestamp);
-        let result = if let Some(item) = self.items.get(id) {
+        if let Some(item) = self.items.get(id) {
             info!("Launching recent item {:?} for {}", item, self.app.id());
             self.launcher
                 .launch_uri(self.app.id().clone(), item.uri.clone())
@@ -193,15 +186,7 @@ impl<S: AsyncItemsSource<AppLaunchItem> + Send + Sync + 'static> AppItemSearchPr
         } else {
             error!("Item with ID {} not found for {}", id, self.app.id());
             Err(zbus::fdo::Error::Failed(format!("Result {} not found", id)))
-        };
-        trace!(
-            "ActivateResult({}, {:?}, {}) -> {:?}",
-            id,
-            terms,
-            timestamp,
-            result
-        );
-        result
+        }
     }
 
     /// Launch a search within the App.
@@ -210,11 +195,10 @@ impl<S: AsyncItemsSource<AppLaunchItem> + Send + Sync + 'static> AppItemSearchPr
     /// The arguments are the current search terms and a timestamp.
     ///
     /// Currently it simply launches the app without any arguments.
-    async fn launch_search(&self, terms: Vec<String>, timestamp: u32) -> zbus::fdo::Result<()> {
-        trace!("Enter LaunchSearch({:?}, {:?})", terms, timestamp);
+    #[instrument(skip(self), fields(app_id = field::debug(self.app.id())))]
+    async fn launch_search(&self, _terms: Vec<String>, _timestamp: u32) -> zbus::fdo::Result<()> {
         info!("Launching app {} directly", self.app.id());
-        let result = self
-            .launcher
+        self.launcher
             .launch_app(self.app.id().clone())
             .await
             .map_err(|error| {
@@ -224,13 +208,6 @@ impl<S: AsyncItemsSource<AppLaunchItem> + Send + Sync + 'static> AppItemSearchPr
                     self.app.id(),
                     error
                 ))
-            });
-        trace!(
-            "Enter LaunchSearch({:?}, {:?}) -> {:?}",
-            terms,
-            timestamp,
-            result
-        );
-        result
+            })
     }
 }

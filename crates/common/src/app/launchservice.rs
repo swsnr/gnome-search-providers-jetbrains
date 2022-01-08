@@ -14,7 +14,10 @@ use gio::prelude::*;
 use glib::SourceId;
 // use glib::clone;
 use libc::pid_t;
-use log::{debug, error, info, trace, warn};
+use tracing::field;
+use tracing::{debug, error, info, span, trace, warn};
+use tracing::{instrument, Level, Span};
+use tracing_futures::Instrument;
 use zbus::zvariant::OwnedObjectPath;
 
 use crate::glib::VariantDict;
@@ -31,6 +34,7 @@ pub struct SystemdScopeSettings {
     pub documentation: Vec<String>,
 }
 
+#[instrument(skip(connection))]
 async fn move_launched_process_to_scope(
     connection: &zbus::Connection,
     id: &str,
@@ -142,9 +146,14 @@ impl From<gio::DesktopAppInfo> for App {
 /// Request to launch an app, with an URI to launch with.
 #[derive(Debug)]
 struct AppLaunchRequest {
+    /// The ID of the app to launch.
     app: AppId,
+    /// The URI to pass to the app on launch.
     uri: Option<String>,
+    /// A one-shot channel to send the result of launching the app to.
     response: futures_channel::oneshot::Sender<Result<(), glib::Error>>,
+    /// The span in which to trace launching.
+    span: Span,
 }
 
 async fn launch_app(
@@ -153,6 +162,7 @@ async fn launch_app(
     uri: Option<&str>,
 ) -> Result<(), glib::Error> {
     let app = gio::DesktopAppInfo::try_from(app_id)?;
+    debug!("Launching App {:?} with uri {:?}", app, &uri);
     match uri {
         None => app.launch_uris_async_future(&[], Some(context)),
         Some(uri) => app.launch_uris_async_future(&[uri], Some(context)),
@@ -160,6 +170,7 @@ async fn launch_app(
     .await
 }
 
+#[instrument(skip(main_context, connection))]
 fn handle_launched(
     main_context: glib::MainContext,
     connection: zbus::Connection,
@@ -198,7 +209,7 @@ fn handle_launched(
                         info!("Moved running process {} of app {} into new systemd scope {} at {}",pid, id, &name, path.into_inner());
                     },
                 };
-            })
+            }.in_current_span())
         }
     }
 }
@@ -210,9 +221,13 @@ fn handle_launch(
 ) {
     main_context.spawn_local(async move {
         // We don't care if the receiver already dropped their side of the channel
-        let _ = request
-            .response
-            .send(launch_app(&launch_context, &request.app, request.uri.as_deref()).await);
+        let _ = request.response.send(
+            launch_app(&launch_context, &request.app, request.uri.as_deref())
+                .instrument(
+                    span!(parent: request.span.clone(), Level::INFO, "handle_launch", request.app = field::debug(&request.app), request.uri = field::debug(&request.uri)),
+                )
+                .await,
+        );
     });
 }
 
@@ -307,20 +322,22 @@ pub struct AppLaunchClient {
 }
 
 impl AppLaunchClient {
+    #[instrument(skip(self))]
     async fn launch(&self, app: AppId, uri: Option<String>) -> Result<(), glib::Error> {
         let (response_tx, response_rx) = futures_channel::oneshot::channel();
-        self.send
-            .send(AppLaunchRequest {
-                app,
-                uri,
-                response: response_tx,
-            })
-            .map_err(|err| {
-                glib::Error::new(
-                    glib::FileError::Failed,
-                    &format!("Failed to launch app: {}", err),
-                )
-            })?;
+        let request = AppLaunchRequest {
+            app,
+            uri,
+            span: Span::current(),
+            response: response_tx,
+        };
+        trace!("Sending launch request {:?}", &request);
+        self.send.send(request).map_err(|err| {
+            glib::Error::new(
+                glib::FileError::Failed,
+                &format!("Failed to launch app: {}", err),
+            )
+        })?;
         // If the sender was dropped
         response_rx.await.unwrap_or_else(|_| {
             Err(glib::Error::new(

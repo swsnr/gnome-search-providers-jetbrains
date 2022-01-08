@@ -19,13 +19,15 @@ use elementtree::Element;
 use lazy_static::lazy_static;
 use log::{debug, error, info, trace};
 use regex::Regex;
+use tracing::{instrument, Span};
+use tracing_futures::Instrument;
 
 use gnome_search_provider_common::app::*;
 use gnome_search_provider_common::futures_channel;
 use gnome_search_provider_common::gio;
 use gnome_search_provider_common::gio::glib;
 use gnome_search_provider_common::gio::prelude::*;
-use gnome_search_provider_common::log::*;
+use gnome_search_provider_common::logging::*;
 use gnome_search_provider_common::mainloop::*;
 use gnome_search_provider_common::matching::*;
 use gnome_search_provider_common::source::*;
@@ -78,6 +80,7 @@ impl VersionedPath {
     /// Extract the version number from the given path.
     ///
     /// Return `None` if the path doesn't contain any valid version.
+    #[instrument]
     fn extract_version(path: PathBuf) -> Option<VersionedPath> {
         lazy_static! {
             static ref RE: Regex = Regex::new(r"(\d{1,4}).(\d{1,2})").unwrap();
@@ -156,6 +159,7 @@ impl ConfigLocation<'_> {
     }
 
     /// Find the latest recent projects file.
+    #[instrument]
     async fn find_latest_recent_projects_file(&self, config_home: &Path) -> Result<PathBuf> {
         let file = self
             .find_config_dir_of_latest_version(config_home)
@@ -190,7 +194,7 @@ async fn read_name_from_file<P: AsRef<Path>>(path: P) -> Result<String> {
 /// Look for a `name` file in the `.idea` sub-directory; if that file does not exist
 /// or cannot be read take the file name of `path`, and ultimately return `None` if
 /// the name cannot be determined.
-async fn get_project_name<P: AsRef<Path>>(path: P) -> Option<String> {
+async fn get_project_name<P: AsRef<Path> + std::fmt::Debug>(path: P) -> Option<String> {
     match read_name_from_file(path.as_ref()).await {
         Ok(name) => Some(name),
         Err(error) => {
@@ -337,12 +341,14 @@ const PROVIDERS: &[ProviderDefinition] = &[
     },
 ];
 
+#[derive(Debug)]
 struct JetbrainsProjectsSource<'a> {
     app_id: AppId,
     /// Where to look for the configuration and the list of recent projects.
     config: &'a ConfigLocation<'a>,
 }
 
+#[instrument]
 async fn read_recent_items(
     config: &ConfigLocation<'_>,
     app_id: AppId,
@@ -388,17 +394,23 @@ async fn read_recent_items(
 impl AsyncItemsSource<AppLaunchItem> for JetbrainsProjectsSource<'static> {
     type Err = anyhow::Error;
 
+    #[instrument()]
     async fn find_recent_items(&self) -> Result<IdMap<AppLaunchItem>, Self::Err> {
         let (send, recv) = futures_channel::oneshot::channel();
         let app_id = self.app_id.clone();
         let config = self.config;
+        let span = Span::current();
         // Move to the main thread and then asynchronously read recent items through Gio,
-        // and get them sent back to us via a oneshot channel.
+        // and get them sent back to us via a oneshot channel.  We can't run the future
+        // right away, because Gio futures aren't Send.
         glib::MainContext::default().invoke(move || {
-            glib::MainContext::default().spawn_local(async move {
-                let result = read_recent_items(config, app_id).await;
-                send.send(result).unwrap();
-            });
+            glib::MainContext::default().spawn_local(
+                async move {
+                    let result = read_recent_items(config, app_id).await;
+                    send.send(result).unwrap();
+                }
+                .instrument(span),
+            );
         });
         recv.await.unwrap()
     }
@@ -514,7 +526,7 @@ fn main() {
             println!("{}", label)
         }
     } else {
-        setup_logging_for_service(env!("CARGO_PKG_VERSION"));
+        setup_logging_for_service();
 
         info!(
             "Started {} version: {}",

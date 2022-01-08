@@ -9,7 +9,7 @@
 #![deny(warnings, missing_docs, clippy::all)]
 
 pub mod app;
-pub mod log;
+pub mod logging;
 pub mod mainloop;
 pub mod matching;
 pub mod source;

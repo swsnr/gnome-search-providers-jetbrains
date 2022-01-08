@@ -8,7 +8,7 @@
 
 use std::fmt::Debug;
 
-use log::trace;
+use tracing::trace;
 
 pub use indexmap::IndexMap;
 
