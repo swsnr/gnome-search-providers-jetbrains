@@ -1,4 +1,4 @@
 [D-BUS Service]
 Name=de.swsnr.searchprovider.Jetbrains
 Exec={LIBEXECDIR}/gnome-search-providers-jetbrains
-SystemdService=de.swsnr.searchprovider.Jetbrains.service
+SystemdService=gnome-search-providers-jetbrains.service

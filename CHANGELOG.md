@@ -8,6 +8,7 @@ and this project doesn't really care for versioning.
 
 ### Changed
 - Update dependencies.
+- Rename `de.swsnr.searchprovider.Jetbrains.service` to `gnome-search-providers-jetbrains.service`.
 
 ## [1.8.0] – 2021-11-24
 
