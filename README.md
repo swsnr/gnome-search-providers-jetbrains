@@ -53,6 +53,14 @@ I do **not** support or endorse these repositories, **use at your own risk.**
 
 To uninstall use `sudo make uninstall`.
 
+## Debugging
+
+To enable debug information for the service run `systemctl --user service-log-level gnome-search-providers-jetbrains.service info`.
+Use `debug` instead of `info` for even more verbose logging.
+The default level is `notice`.
+
+Alternatively start the executable directly with `RUST_LOG=debug` or `RUST_LOG=trace`.
+
 ## License
 
 Copyright Sebastian Wiesner <sebastian@swsnr.de>

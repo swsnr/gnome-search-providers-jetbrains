@@ -6,10 +6,15 @@ and this project doesn't really care for versioning.
 
 ## [Unreleased]
 
+### Added
+- Implement `LogControl` DBus interface, in order to set the log level with `systemctl service-log-level` (see [GH-27]).
+
 ### Changed
 - Update dependencies.
 - Use `tracing` for logging.
 - Rename `de.swsnr.searchprovider.Jetbrains.service` to `gnome-search-providers-jetbrains.service`.
+
+[GH-27]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/pull/27
 
 ## [1.8.0] – 2021-11-24
 
