@@ -17,8 +17,8 @@ use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
 use elementtree::Element;
 use lazy_static::lazy_static;
-use log::{debug, error, info, trace};
 use regex::Regex;
+use tracing::{debug, error, info, trace};
 use tracing::{instrument, Span};
 use tracing_futures::Instrument;
 
