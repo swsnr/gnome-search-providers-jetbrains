@@ -198,9 +198,9 @@ async fn get_project_name<P: AsRef<Path> + std::fmt::Debug>(path: P) -> Option<S
     match read_name_from_file(path.as_ref()).await {
         Ok(name) => Some(name),
         Err(error) => {
-            debug!("Failed to read project name from file: {:#}", error);
             debug!(
-                "Falling back to file name of {} as project name",
+                "Failed to read project name from file {:#}; falling back to file name of {}",
+                error,
                 path.as_ref().display()
             );
             path.as_ref()
