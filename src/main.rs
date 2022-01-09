@@ -441,7 +441,7 @@ struct Service {
 ///
 /// Then register the connection on the Glib main loop and install a callback to
 /// handle incoming messages.
-async fn start_dbus_service() -> Result<Service> {
+async fn start_dbus_service(log_control: LogControl) -> Result<Service> {
     let launch_service = AppLaunchService::new();
     // Create search providers for all apps we find
     let providers = PROVIDERS
@@ -482,6 +482,7 @@ async fn start_dbus_service() -> Result<Service> {
                 b.serve_at(path, provider)
             },
         )?
+        .serve_at("/org/freedesktop/LogControl1", log_control)?
         .name(BUSNAME)?
         // We disable the internal executor because we'd like to run the connection
         // exclusively on the glib mainloop, and thus tick it manually (see below).
@@ -526,7 +527,7 @@ fn main() {
             println!("{}", label)
         }
     } else {
-        setup_logging_for_service();
+        let log_control = setup_logging_for_service();
 
         info!(
             "Started {} version: {}",
@@ -538,7 +539,7 @@ fn main() {
         let context = glib::MainContext::default();
         context.push_thread_default();
 
-        match context.block_on(start_dbus_service()) {
+        match context.block_on(start_dbus_service(log_control)) {
             Ok(service) => {
                 let _ = service.launch_service.start(
                     &context,

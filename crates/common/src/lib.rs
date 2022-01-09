@@ -8,6 +8,8 @@
 
 #![deny(warnings, missing_docs, clippy::all)]
 
+mod logcontrol;
+
 pub mod app;
 pub mod logging;
 pub mod mainloop;
