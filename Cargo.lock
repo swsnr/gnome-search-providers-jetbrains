@@ -573,7 +573,7 @@ dependencies = [
 
 [[package]]
 name = "gnome-search-provider-common"
-version = "0.1.0"
+version = "1.9.0"
 dependencies = [
  "async-trait",
  "futures-channel",
@@ -595,7 +595,7 @@ dependencies = [
 
 [[package]]
 name = "gnome-search-providers-jetbrains"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "anyhow",
  "async-trait",
