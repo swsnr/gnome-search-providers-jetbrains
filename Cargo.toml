@@ -16,7 +16,7 @@ publish = false
 [dependencies]
 regex = "^1.4"
 lazy_static = "^1.4"
-elementtree = "^0.5"
+elementtree = "^0.6"
 anyhow = "^1.0"
 clap = { version = "^3", default-features = false, features=["std", "cargo"] }
 gnome-search-provider-common = { path = "./crates/common" }

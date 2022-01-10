@@ -297,9 +297,9 @@ checksum = "e78d4f1cc4ae33bbfc157ed5d5a5ef3bc29227303d595861deb238fcec4e9457"
 
 [[package]]
 name = "elementtree"
-version = "0.5.0"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "19c5d32d0ab83734d2d7452047ef901c105991044b7b07da30fe82371a149a25"
+checksum = "5bb4cfb21796a230a1d5ffdbad0299694629c00c136f98b8a4b3dc7a7c26ac6c"
 dependencies = [
  "string_cache",
  "xml-rs",
