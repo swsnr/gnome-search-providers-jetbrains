@@ -20,7 +20,7 @@ build:
 	cargo build --release --locked
 
 .PHONY: install
-install: build
+install:
 	mkdir -p target/dbus-1 target/systemd
 	sed "s:{LIBEXECDIR}:$(LIBEXECDIR):g" "dbus-1/de.swsnr.searchprovider.Jetbrains.service" > "target/dbus-1/de.swsnr.searchprovider.Jetbrains.service"
 	sed "s:{LIBEXECDIR}:$(LIBEXECDIR):g" "systemd/gnome-search-providers-jetbrains.service" > "target/systemd/gnome-search-providers-jetbrains.service"

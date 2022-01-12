@@ -6,6 +6,10 @@ and this project doesn't really care for versioning.
 
 ## [Unreleased]
 
+### Fixed
+
+- Remove target dependencies from Makefile to simplify manual installation.
+
 ## [1.9.0] – 2022-01-10
 
 ### Added
