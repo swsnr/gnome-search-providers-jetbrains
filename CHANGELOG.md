@@ -6,6 +6,8 @@ and this project doesn't really care for versioning.
 
 ## [Unreleased]
 
+## [1.9.1] – 2022-01-12
+
 ### Fixed
 
 - Remove target dependencies from Makefile to simplify manual installation.
@@ -145,7 +147,8 @@ and this project doesn't really care for versioning.
 
 Initial prototype in Python, with support for Toolbox IDEA CE and WebStorm.
 
-[Unreleased]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/compare/v1.9.0...HEAD
+[Unreleased]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/compare/v1.9.1...HEAD
+[1.9.1]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/compare/v1.9.0...v1.9.1
 [1.9.0]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/compare/v1.8.0...v1.9.0
 [1.8.0]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/compare/v1.7.1...v1.8.0
 [1.7.1]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/compare/v1.7.0...v1.7.1
