@@ -1,3 +1,5 @@
+**MOVED TO <https://codeberg.org/flausch/gnome-search-providers-jetbrains/>**
+
 # Gnome search provider for Jetbrains projects
 
 Add recent projects of various Jetbrains IDEs to Gnome search.
