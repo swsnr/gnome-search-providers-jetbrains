@@ -22,7 +22,7 @@ and this project doesn't really care for versioning.
 - Use `tracing` for logging.
 - Rename `de.swsnr.searchprovider.Jetbrains.service` to `gnome-search-providers-jetbrains.service`.
 
-[GH-27]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/pull/27
+[GH-27]: https://codeberg.org/flausch/gnome-search-providers-jetbrains/pulls/27
 
 ## [1.8.0] – 2021-11-24
 
@@ -61,7 +61,7 @@ and this project doesn't really care for versioning.
 - The systemd service now logs directly to the systemd journal; this improves representation of log levels in logging (see [GH-17]).
 - Rename scopes for running IDE instances to clarify the origin of the scope, and distinguish apps started from the search provider from apps started by Gnome Shell.
 
-[GH-17]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/pull/17
+[GH-17]: https://codeberg.org/flausch/gnome-search-providers-jetbrains/pulls/17
 
 ## [1.4.1] – 2021-05-19
 
@@ -69,8 +69,8 @@ and this project doesn't really care for versioning.
 
 - Correctly parse recent solutions from Rider (see [GH-12] and [GH-13], thanks [axelgenus]).
 
-[GH-12]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/issues/12 
-[GH-13]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/pull/13 
+[GH-12]: https://codeberg.org/flausch/gnome-search-providers-jetbrains/issues/12
+[GH-13]: https://codeberg.org/flausch/gnome-search-providers-jetbrains/pulls/13
 
 [axelgenus]: https://github.com/axelgenus
 
@@ -90,7 +90,7 @@ and this project doesn't really care for versioning.
 
 ### Changed
 
-- Improve order of matches: 
+- Improve order of matches:
   - Rank matches in the project name higher than matches in the path, and
   - rank path matches by position of term in match (the more to the right the better the term matched the more specific segments of the path).
 
@@ -139,28 +139,28 @@ and this project doesn't really care for versioning.
 - Fix overly lax matching, by replacing fuzzy searching with strict substring matching (see [GH-7]).
 
 [atomicptr]: https://github.com/atomicptr
-[GH-3]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/issues/3
-[GH-6]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/pull/6
-[GH-7]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/issues/7
+[GH-3]: https://codeberg.org/flausch/gnome-search-providers-jetbrains/issues/3
+[GH-6]: https://codeberg.org/flausch/gnome-search-providers-jetbrains/pulls/6
+[GH-7]: https://codeberg.org/flausch/gnome-search-providers-jetbrains/issues/7
 
 ## [1] – 2020-04-11
 
 Initial prototype in Python, with support for Toolbox IDEA CE and WebStorm.
 
-[Unreleased]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/compare/v1.9.1...HEAD
-[1.9.1]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/compare/v1.9.0...v1.9.1
-[1.9.0]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/compare/v1.8.0...v1.9.0
-[1.8.0]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/compare/v1.7.1...v1.8.0
-[1.7.1]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/compare/v1.7.0...v1.7.1
-[1.7.0]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/compare/v1.6.0...v1.7.0
-[1.6.0]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/compare/v1.5.0...v1.6.0
-[1.5.0]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/compare/v1.4.1...v1.5.0
-[1.4.1]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/compare/v1.4.0...v1.4.1
-[1.4.0]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/compare/v1.3.0...v1.4.0
-[1.3.0]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/compare/v1.2.3...v1.3.0
-[1.2.3]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/compare/v1.2.2...v1.2.3
-[1.2.2]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/compare/v1.2.1...v1.2.2
-[1.2.1]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/compare/v1.2.0...v1.2.1
-[1.2.0]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/compare/v1.1.0...v1.2.0
-[1.1.0]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/compare/v1...v1.1.0
-[1]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/releases/tag/v1
+[Unreleased]: https://codeberg.org/flausch/gnome-search-providers-jetbrains/compare/v1.9.1...HEAD
+[1.9.1]: https://codeberg.org/flausch/gnome-search-providers-jetbrains/compare/v1.9.0...v1.9.1
+[1.9.0]: https://codeberg.org/flausch/gnome-search-providers-jetbrains/compare/v1.8.0...v1.9.0
+[1.8.0]: https://codeberg.org/flausch/gnome-search-providers-jetbrains/compare/v1.7.1...v1.8.0
+[1.7.1]: https://codeberg.org/flausch/gnome-search-providers-jetbrains/compare/v1.7.0...v1.7.1
+[1.7.0]: https://codeberg.org/flausch/gnome-search-providers-jetbrains/compare/v1.6.0...v1.7.0
+[1.6.0]: https://codeberg.org/flausch/gnome-search-providers-jetbrains/compare/v1.5.0...v1.6.0
+[1.5.0]: https://codeberg.org/flausch/gnome-search-providers-jetbrains/compare/v1.4.1...v1.5.0
+[1.4.1]: https://codeberg.org/flausch/gnome-search-providers-jetbrains/compare/v1.4.0...v1.4.1
+[1.4.0]: https://codeberg.org/flausch/gnome-search-providers-jetbrains/compare/v1.3.0...v1.4.0
+[1.3.0]: https://codeberg.org/flausch/gnome-search-providers-jetbrains/compare/v1.2.3...v1.3.0
+[1.2.3]: https://codeberg.org/flausch/gnome-search-providers-jetbrains/compare/v1.2.2...v1.2.3
+[1.2.2]: https://codeberg.org/flausch/gnome-search-providers-jetbrains/compare/v1.2.1...v1.2.2
+[1.2.1]: https://codeberg.org/flausch/gnome-search-providers-jetbrains/compare/v1.2.0...v1.2.1
+[1.2.0]: https://codeberg.org/flausch/gnome-search-providers-jetbrains/compare/v1.1.0...v1.2.0
+[1.1.0]: https://codeberg.org/flausch/gnome-search-providers-jetbrains/compare/v1...v1.1.0
+[1]: https://codeberg.org/flausch/gnome-search-providers-jetbrains/releases/tag/v1
