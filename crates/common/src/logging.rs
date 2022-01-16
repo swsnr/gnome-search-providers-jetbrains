@@ -6,6 +6,7 @@
 
 //! Logging setup
 
+use std::any::TypeId;
 use std::default::Default;
 
 use tracing::{debug, error, warn};
@@ -192,24 +193,25 @@ impl LogController for TracingController {
         self.target = tracing_target;
         Ok(())
     }
+
+    fn syslog_identifier(&self) -> String {
+        self.target_handle
+            .with_current(|layer| {
+                unsafe { layer.downcast_raw(TypeId::of::<JournalLayer>()) }
+                    .map(|raw| unsafe { &*(raw as *const JournalLayer) }.as_ref())
+                    // We know that we've got a journal layer here, so we can definitely unwrap().
+                    // If this fails it's definitely a bug!
+                    .unwrap()
+                    .map(|journal| journal.syslog_identifier().into())
+                    .unwrap_or_default()
+            })
+            .unwrap_or_default()
+    }
 }
 
-/// Setup logging for a service.
-///
-/// If stdout or stderr are connected to the systemd journal setup direct
-/// logging to journald; otherwise log to stdout.  The default level is info.
-///
-/// Return a `LogControl` struct which implements the systemd log control DBus
-/// interface, see <https://www.freedesktop.org/software/systemd/man/org.freedesktop.LogControl1.html>.
-///
-/// This allows changing the log configuration at runtime with `systemctl service-log-level`.
-pub fn setup_logging_for_service() -> LogControl {
-    glib::log_set_default_handler(glib::rust_log_handler);
-    tracing_log::LogTracer::init().unwrap();
-
+fn create_log_subscriber(connected_to_journal: bool) -> (impl Subscriber, TracingController) {
     let env_filter = tracing_subscriber::EnvFilter::try_from_default_env().ok();
 
-    let connected_to_journal = libsystemd::logging::connected_to_journal();
     let default_target = if connected_to_journal {
         TracingTarget::Journal
     } else {
@@ -230,7 +232,6 @@ pub fn setup_logging_for_service() -> LogControl {
         .with(env_filter)
         .with(level)
         .with(target);
-    tracing::subscriber::set_global_default(subscriber).unwrap();
 
     let controller = TracingController {
         connected_to_journal,
@@ -240,5 +241,51 @@ pub fn setup_logging_for_service() -> LogControl {
         target_handle,
     };
 
+    (subscriber, controller)
+}
+
+/// Setup logging for a service.
+///
+/// If stdout or stderr are connected to the systemd journal setup direct
+/// logging to journald; otherwise log to stdout.  The default level is info.
+///
+/// Return a `LogControl` struct which implements the systemd log control DBus
+/// interface, see <https://www.freedesktop.org/software/systemd/man/org.freedesktop.LogControl1.html>.
+///
+/// This allows changing the log configuration at runtime with `systemctl service-log-level`.
+pub fn setup_logging_for_service() -> LogControl {
+    let (subscriber, controller) =
+        create_log_subscriber(libsystemd::logging::connected_to_journal());
+
+    // Setup tracing, and the redirect glib to log and log to tracing, to make sure everything
+    // ends up in our log configuration.
+    tracing::subscriber::set_global_default(subscriber).unwrap();
+    glib::log_set_default_handler(glib::rust_log_handler);
+    tracing_log::LogTracer::init().unwrap();
+
     LogControl::new(controller)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn syslog_identifier_from_journal_layer() {
+        let (subscriber, controller) = create_log_subscriber(true);
+        assert!(!controller.syslog_identifier().is_empty());
+        assert!(controller
+            .syslog_identifier()
+            .contains(env!("CARGO_CRATE_NAME")));
+        // Make sure the subscriber is alive until after we test the syslog identifier,
+        // because tracing otherwise tears down the layer.
+        drop(subscriber)
+    }
+
+    #[test]
+    fn syslog_identifier_with_journal_layer() {
+        let (subscriber, controller) = create_log_subscriber(false);
+        assert!(controller.syslog_identifier().is_empty());
+        drop(subscriber)
+    }
 }

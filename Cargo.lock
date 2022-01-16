@@ -1365,9 +1365,9 @@ dependencies = [
 
 [[package]]
 name = "tracing-journald"
-version = "0.2.1"
+version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3660fa7a4ca169c110b79708b036b0d5ef2b361cbc8418ee4295229d66b98d98"
+checksum = "9863a586a2ede0c98ccfd14cedecaa1f59a94eb1029bc33a71c7518235d5e886"
 dependencies = [
  "libc",
  "tracing-core",

@@ -147,6 +147,9 @@ pub trait LogController: Send + Sync {
 
     /// Set the target of the underlying log framework.
     fn set_target(&mut self, target: LogTarget) -> zbus::fdo::Result<()>;
+
+    /// Get the syslog identifier.
+    fn syslog_identifier(&self) -> String;
 }
 
 /// Control logging remotely.
@@ -160,7 +163,7 @@ impl LogControl {
     ///
     /// `target` and `level` are the initial defaults for the configured log target and log level.
     ///
-    /// Return the control interface, and a receiver for requests made by the control interface.  
+    /// Return the control interface, and a receiver for requests made by the control interface.
     /// The caller needs to listen on this receiver for log configuration requests and update the
     /// logging state accordingly.
     pub(crate) fn new<T: LogController + 'static>(controller: T) -> Self {
@@ -212,6 +215,6 @@ impl LogControl {
     #[dbus_interface(property)]
     #[instrument(skip(self))]
     async fn syslog_identifier(&self) -> String {
-        unimplemented!()
+        self.controller.syslog_identifier()
     }
 }
