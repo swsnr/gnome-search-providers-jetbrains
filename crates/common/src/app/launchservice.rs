@@ -164,8 +164,8 @@ async fn launch_app(
     let app = gio::DesktopAppInfo::try_from(app_id)?;
     debug!("Launching App {:?} with uri {:?}", app, &uri);
     match uri {
-        None => app.launch_uris_async_future(&[], Some(context)),
-        Some(uri) => app.launch_uris_async_future(&[uri], Some(context)),
+        None => app.launch_uris_future(&[], Some(context)),
+        Some(uri) => app.launch_uris_future(&[uri], Some(context)),
     }
     .await
 }
@@ -209,7 +209,7 @@ fn handle_launched(
                         info!("Moved running process {} of app {} into new systemd scope {} at {}",pid, id, &name, path.into_inner());
                     },
                 };
-            }.in_current_span())
+            }.in_current_span());
         }
     }
 }

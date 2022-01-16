@@ -28,8 +28,8 @@ tracing-futures = { version = "0.2.5", default-features = false, features = [
 futures-util = "^0.3"
 futures-channel = "^0.3"
 parking_lot = "0.11.2"
-gio = { version = "^0.14", features = ["v2_60"] }
-glib = { version = "^0.14", features = ["log"] }
+gio = { version = "0.15.2", features = ["v2_60"] }
+glib = { version = "0.15.2", features = ["log"] }
 libc = "^0.2"
 libsystemd = "0.5.0"
 async-trait = "^0.1"

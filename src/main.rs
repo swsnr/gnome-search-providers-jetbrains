@@ -126,14 +126,14 @@ impl ConfigLocation<'_> {
     async fn find_config_dir_of_latest_version(&self, config_home: &Path) -> Result<VersionedPath> {
         let vendor_dir = gio::File::for_path(config_home.join(self.vendor_dir));
         let files: Vec<gio::FileInfo> = vendor_dir
-            .enumerate_children_async_future(
+            .enumerate_children_future(
                 &gio::FILE_ATTRIBUTE_STANDARD_NAME,
                 gio::FileQueryInfoFlags::NONE,
                 glib::PRIORITY_DEFAULT,
             )
             .await
             .with_context(|| format!("Failed to enumerate children of {}", vendor_dir.uri()))?
-            .next_files_async_future(i32::MAX, glib::PRIORITY_DEFAULT)
+            .next_files_future(i32::MAX, glib::PRIORITY_DEFAULT)
             .await
             .with_context(|| format!("Failed to get children of {}", vendor_dir.uri()))?;
 
@@ -183,7 +183,7 @@ async fn read_name_from_file<P: AsRef<Path>>(path: P) -> Result<String> {
     let name_file = gio::File::for_path(path.as_ref().join(".idea").join(".name"));
     trace!("Trying to read name from {}", name_file.uri());
     let (data, _) = name_file
-        .load_contents_async_future()
+        .load_contents_future()
         .await
         .with_context(|| format!("Failed to read project name from {}", name_file.uri()))?;
     Ok(String::from_utf8_lossy(&data).trim().to_string())
@@ -362,7 +362,7 @@ async fn read_recent_items(
     );
 
     let (data, _) = projects_file
-        .load_contents_async_future()
+        .load_contents_future()
         .await
         .with_context(|| {
             format!(
@@ -535,14 +535,10 @@ fn main() {
             env!("CARGO_PKG_VERSION")
         );
 
-        trace!("Acquire main context");
-        let context = glib::MainContext::default();
-        context.push_thread_default();
-
-        match context.block_on(start_dbus_service(log_control)) {
+        match glib::MainContext::ref_thread_default().block_on(start_dbus_service(log_control)) {
             Ok(service) => {
                 let _ = service.launch_service.start(
-                    &context,
+                    &glib::MainContext::ref_thread_default(),
                     service.connection,
                     SystemdScopeSettings {
                         prefix: concat!("app-", env!("CARGO_BIN_NAME")).to_string(),
@@ -550,7 +546,7 @@ fn main() {
                         documentation: vec![env!("CARGO_PKG_HOMEPAGE").to_string()],
                     },
                 );
-                create_main_loop(&context).run();
+                create_main_loop(&glib::MainContext::ref_thread_default()).run();
             }
             Err(error) => {
                 error!("Failed to start DBus server: {:#}", error);
