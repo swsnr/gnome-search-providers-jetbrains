@@ -6,6 +6,11 @@ and this project doesn't really care for versioning.
 
 ## [Unreleased]
 
+### Changed
+
+- Return proper syslog identifier from systemd log control interface.
+- Update gio and glib dependencies.
+
 ## [1.9.1] – 2022-01-12
 
 ### Fixed
