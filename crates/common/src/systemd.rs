@@ -7,7 +7,6 @@
 //! Systemd utilities.
 
 use libc::pid_t;
-use libsystemd::unit::escape_name;
 use tracing::{debug, trace};
 use zbus::dbus_proxy;
 use zbus::zvariant::{OwnedObjectPath, Value};
@@ -58,6 +57,30 @@ pub struct ScopeProperties<'a> {
     pub description: Option<&'a str>,
     /// The optional documentation URLs for the unit.
     pub documentation: Vec<&'a str>,
+}
+
+/// Escape a systemd unit name.
+///
+/// See section "STRING ESCAPING FOR INCLUSION IN UNIT NAMES" in `systemd.unit(5)`
+/// for details about the algorithm.
+fn escape_name(name: &str) -> String {
+    if name.is_empty() {
+        "".to_string()
+    } else {
+        name.bytes()
+            .enumerate()
+            .map(|(n, b)| {
+                let c = char::from(b);
+                match c {
+                    '/' => '-'.to_string(),
+                    ':' | '_' | '0'..='9' | 'a'..='z' | 'A'..='Z' => c.to_string(),
+                    '.' if n > 0 => c.to_string(),
+                    _ => format!(r#"\x{:02x}"#, b),
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("")
+    }
 }
 
 /// Start a new systemd application scope for a running process.
