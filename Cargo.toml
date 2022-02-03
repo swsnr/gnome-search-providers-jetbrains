@@ -25,9 +25,9 @@ tracing = "0.1.29"
 tracing-futures = { version = "0.2.5", default-features=false }
 
 [dev-dependencies]
-pretty_assertions = "^1"
-rust-ini = "^0.17"
-globwalk = "^0.8"
+pretty_assertions = "1.1.0"
+globwalk = "0.8.1"
+configparser = "3.0.0"
 
 [workspace]
 members = ["./crates/common"]
