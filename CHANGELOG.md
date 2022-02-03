@@ -8,8 +8,9 @@ and this project doesn't really care for versioning.
 
 ### Changed
 
+- Migrate to <https://codeberg.org/flausch/gnome-search-providers-jetbrains>.
 - Return proper syslog identifier from systemd log control interface.
-- Update gio and glib dependencies.
+- Update dependencies, and remove a few redundant dependencies.
 
 ## [1.9.1] – 2022-01-12
 
