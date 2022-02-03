@@ -12,7 +12,6 @@ use std::sync::Arc;
 
 use gio::prelude::*;
 use glib::SourceId;
-// use glib::clone;
 use libc::pid_t;
 use tracing::field;
 use tracing::{debug, error, info, span, trace, warn};
