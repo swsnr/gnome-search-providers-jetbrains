@@ -580,7 +580,6 @@ dependencies = [
  "indexmap",
  "libc",
  "libsystemd",
- "parking_lot",
  "pretty_assertions",
  "tracing",
  "tracing-futures",
