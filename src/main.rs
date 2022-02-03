@@ -16,7 +16,7 @@ use std::str::FromStr;
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
 use elementtree::Element;
-use lazy_static::lazy_static;
+use once_cell::sync::OnceCell;
 use regex::Regex;
 use tracing::{debug, error, info, trace};
 use tracing::{instrument, Span};
@@ -82,22 +82,19 @@ impl VersionedPath {
     /// Return `None` if the path doesn't contain any valid version.
     #[instrument]
     fn extract_version(path: PathBuf) -> Option<VersionedPath> {
-        lazy_static! {
-            static ref RE: Regex = Regex::new(r"(\d{1,4}).(\d{1,2})").unwrap();
-        }
-
-        trace!("Parsing {} with {}", path.display(), RE.as_str());
+        static RE: OnceCell<Regex> = OnceCell::new();
+        let re = RE.get_or_init(|| Regex::new(r"(\d{1,4}).(\d{1,2})").unwrap());
+        trace!("Parsing {} with {}", path.display(), re.as_str());
 
         let version = path
             .file_name()
             .and_then(OsStr::to_str)
-            .and_then(|filename| RE.captures(filename))
+            .and_then(|filename| re.captures(filename))
             .map(|m| (u16::from_str(&m[1]).unwrap(), u16::from_str(&m[2]).unwrap()));
-
         trace!(
             "Parsing {} with {} -> {:?}",
             path.display(),
-            RE.as_str(),
+            re.as_str(),
             version
         );
 

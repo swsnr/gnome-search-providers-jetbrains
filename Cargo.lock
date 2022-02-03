@@ -549,7 +549,7 @@ dependencies = [
  "elementtree",
  "globwalk",
  "gnome-search-provider-common",
- "lazy_static",
+ "once_cell",
  "pretty_assertions",
  "regex",
  "rust-ini",
