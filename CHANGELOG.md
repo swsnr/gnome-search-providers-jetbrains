@@ -6,6 +6,10 @@ and this project doesn't really care for versioning.
 
 ## [Unreleased]
 
+### Changed
+
+- Drop `async_trait` dependency.
+
 ## [1.10.0] – 2022-02-03
 
 ### Changed

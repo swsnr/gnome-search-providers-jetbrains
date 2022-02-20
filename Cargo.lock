@@ -514,7 +514,6 @@ dependencies = [
 name = "gnome-search-provider-common"
 version = "1.10.0"
 dependencies = [
- "async-trait",
  "futures-channel",
  "futures-util",
  "gio",
@@ -535,10 +534,10 @@ name = "gnome-search-providers-jetbrains"
 version = "1.10.0"
 dependencies = [
  "anyhow",
- "async-trait",
  "clap",
  "configparser",
  "elementtree",
+ "futures-executor",
  "globwalk",
  "gnome-search-provider-common",
  "once_cell",

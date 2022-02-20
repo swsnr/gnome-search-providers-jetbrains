@@ -6,15 +6,13 @@
 
 //! Apps and their recent items.
 
-use tracing::{debug, error, info};
-
 mod item;
 mod launchservice;
 mod provider;
 
 pub use item::AppLaunchItem;
 pub use launchservice::{App, AppId, AppLaunchClient, AppLaunchService, SystemdScopeSettings};
-pub use provider::AppItemSearchProvider;
+pub use provider::{AppItemSearchProvider, AppItemSearchRequest};
 
 #[cfg(test)]
 mod tests {
