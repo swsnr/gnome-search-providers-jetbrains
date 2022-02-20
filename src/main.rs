@@ -498,11 +498,11 @@ async fn start_dbus_service(log_control: LogControl) -> Result<Service> {
     })
 }
 
-fn app() -> clap::App<'static> {
+fn app() -> clap::Command<'static> {
     use clap::*;
-    app_from_crate!()
-        .setting(AppSettings::DontCollapseArgsInUsage)
+    command!()
         .setting(AppSettings::DeriveDisplayOrder)
+        .dont_collapse_args_in_usage(true)
         .term_width(80)
         .after_help(
             "\
