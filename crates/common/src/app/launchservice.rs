@@ -169,9 +169,8 @@ async fn launch_app(
     .await
 }
 
-#[instrument(skip(main_context, connection))]
+#[instrument(skip(connection))]
 fn handle_launched(
-    main_context: glib::MainContext,
     connection: zbus::Connection,
     scope_settings: Arc<SystemdScopeSettings>,
     app: &gio::AppInfo,
@@ -191,7 +190,7 @@ fn handle_launched(
                 || format!("app started by {}", scope_settings.started_by),
                 |value| format!("{} started by {}", value, scope_settings.started_by),
             );
-            main_context.spawn(async move {
+            glib::MainContext::ref_thread_default().spawn(async move {
                 let result = move_launched_process_to_scope(
                     &connection,
                     &id,
@@ -213,12 +212,8 @@ fn handle_launched(
     }
 }
 
-fn handle_launch(
-    main_context: glib::MainContext,
-    launch_context: gio::AppLaunchContext,
-    request: AppLaunchRequest,
-) {
-    main_context.spawn_local(async move {
+fn handle_launch(launch_context: gio::AppLaunchContext, request: AppLaunchRequest) {
+    glib::MainContext::ref_thread_default().spawn_local(async move {
         // We don't care if the receiver already dropped their side of the channel
         let _ = request.response.send(
             launch_app(&launch_context, &request.app, request.uri.as_deref())
@@ -270,37 +265,30 @@ impl AppLaunchService {
     #[must_use]
     pub fn start(
         self,
-        main_context: &glib::MainContext,
         connection: zbus::Connection,
         scope_settings: SystemdScopeSettings,
     ) -> (AppLaunchClient, SourceId) {
         let scope_settings_arc = Arc::new(scope_settings);
         let launch_context = gio::AppLaunchContext::new();
-        launch_context.connect_launched(
-            glib::clone!(@strong main_context => move |_, app, platform_data| {
-                trace!(
-                    "App {} launched with platform_data: {:?}",
-                    app.id().unwrap(),
-                    platform_data
-                );
-                handle_launched(
-                    main_context.clone(),
-                    connection.clone(),
-                    scope_settings_arc.clone(),
-                    app,
-                    platform_data,
-                )
-            }),
-        );
+        launch_context.connect_launched(move |_, app, platform_data| {
+            trace!(
+                "App {} launched with platform_data: {:?}",
+                app.id().unwrap(),
+                platform_data
+            );
+            handle_launched(
+                connection.clone(),
+                scope_settings_arc.clone(),
+                app,
+                platform_data,
+            )
+        });
 
         let client = self.client();
-        let source = self.recv.attach(
-            Some(main_context),
-            glib::clone!(@strong main_context => move |request: AppLaunchRequest| {
-                handle_launch(main_context.clone(), launch_context.clone(), request);
-                glib::Continue(true)
-            }),
-        );
+        let source = self.recv.attach(None, move |request: AppLaunchRequest| {
+            handle_launch(launch_context.clone(), request);
+            glib::Continue(true)
+        });
         (client, source)
     }
 

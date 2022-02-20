@@ -535,7 +535,6 @@ fn main() {
         match glib::MainContext::ref_thread_default().block_on(start_dbus_service(log_control)) {
             Ok(service) => {
                 let _ = service.launch_service.start(
-                    &glib::MainContext::ref_thread_default(),
                     service.connection,
                     SystemdScopeSettings {
                         prefix: concat!("app-", env!("CARGO_BIN_NAME")).to_string(),
