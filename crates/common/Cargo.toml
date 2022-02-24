@@ -36,4 +36,3 @@ pretty_assertions = "^1"
 
 [package.metadata.release]
 shared-version = true
-tag = false
