@@ -6,6 +6,8 @@ and this project doesn't really care for versioning.
 
 ## [Unreleased]
 
+## [1.11.0] – 2022-02-24
+
 ### Changed
 
 - Drop `async_trait` dependency.
@@ -159,7 +161,8 @@ and this project doesn't really care for versioning.
 
 Initial prototype in Python, with support for Toolbox IDEA CE and WebStorm.
 
-[Unreleased]: https://codeberg.org/flausch/gnome-search-providers-jetbrains/compare/v1.10.0...HEAD
+[Unreleased]: https://codeberg.org/flausch/gnome-search-providers-jetbrains/compare/v1.11.0...HEAD
+[1.11.0]: https://codeberg.org/flausch/gnome-search-providers-jetbrains/compare/v1.10.0...v1.11.0
 [1.10.0]: https://codeberg.org/flausch/gnome-search-providers-jetbrains/compare/v1.9.1...v1.10.0
 [1.9.1]: https://codeberg.org/flausch/gnome-search-providers-jetbrains/compare/v1.9.0...v1.9.1
 [1.9.0]: https://codeberg.org/flausch/gnome-search-providers-jetbrains/compare/v1.8.0...v1.9.0
