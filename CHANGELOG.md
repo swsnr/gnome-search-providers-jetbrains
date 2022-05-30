@@ -6,11 +6,15 @@ and this project doesn't really care for versioning.
 
 ## [Unreleased]
 
+### Fixed
+
+- Release common crate as well.
+
 ## [1.11.1] – 2022-05-30
 
 ### Changed
 
-- Update dependencies
+- Update dependencies.
 
 ## [1.11.0] – 2022-02-24
 
