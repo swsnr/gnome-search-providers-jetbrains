@@ -6,6 +6,8 @@ and this project doesn't really care for versioning.
 
 ## [Unreleased]
 
+## [1.11.2] – 2022-05-30
+
 ### Fixed
 
 - Release common crate as well.
@@ -171,7 +173,8 @@ and this project doesn't really care for versioning.
 
 Initial prototype in Python, with support for Toolbox IDEA CE and WebStorm.
 
-[Unreleased]: https://codeberg.org/flausch/gnome-search-providers-jetbrains/compare/v1.11.1...HEAD
+[Unreleased]: https://codeberg.org/flausch/gnome-search-providers-jetbrains/compare/v1.11.2...HEAD
+[1.11.2]: https://codeberg.org/flausch/gnome-search-providers-jetbrains/compare/v1.11.1...v1.11.2
 [1.11.1]: https://codeberg.org/flausch/gnome-search-providers-jetbrains/compare/v1.11.0...v1.11.1
 [1.11.0]: https://codeberg.org/flausch/gnome-search-providers-jetbrains/compare/v1.10.0...v1.11.0
 [1.10.0]: https://codeberg.org/flausch/gnome-search-providers-jetbrains/compare/v1.9.1...v1.10.0

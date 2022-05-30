@@ -1,7 +1,7 @@
 [package]
 name = "gnome-search-provider-common"
 description = "Common code for Gnome search providers"
-version = "1.11.0"
+version = "1.11.2"
 homepage = "https://codeberg.org/flausch/gnome-search-providers-jetbrains"
 repository = "https://codeberg.org/flausch/gnome-search-providers-jetbrains"
 authors = ["Sebastian Wiesner <sebastian@swsnr.de>"]
