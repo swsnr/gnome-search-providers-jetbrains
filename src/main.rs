@@ -345,37 +345,45 @@ fn read_recent_items(
     app_id: &AppId,
 ) -> Result<IndexMap<String, AppLaunchItem>> {
     event!(Level::INFO, %app_id, "Searching recent projects");
-    let mut items = IndexMap::new();
-    let projects_file = config.find_latest_recent_projects_file(&glib::user_config_dir())?;
-
-    let mut source = File::open(&projects_file).with_context(|| {
-        format!(
-            "Failed to open recent projects file at {}",
-            projects_file.display()
-        )
-    })?;
-
-    let home = glib::home_dir();
-    let home_s = home
-        .to_str()
-        .with_context(|| "Failed to convert home directory path to UTF-8 string")?;
-    for path in parse_recent_jetbrains_projects(home_s, &mut source)? {
-        if let Some(name) = get_project_name(&path) {
-            event!(Level::TRACE, %app_id, "Found project {} at {}", name, path);
-            let id = format!("jetbrains-recent-project-{}-{}", app_id, path);
-            items.insert(
-                id,
-                AppLaunchItem {
-                    name,
-                    uri: path.to_string(),
-                },
-            );
-        } else {
-            event!(Level::TRACE, %app_id, "Skipping {}, failed to determine project name", path);
+    match config
+        .find_latest_recent_projects_file(&glib::user_config_dir())
+        .and_then(|projects_file| {
+            File::open(&projects_file).with_context(|| {
+                format!(
+                    "Failed to open recent projects file at {}",
+                    projects_file.display()
+                )
+            })
+        }) {
+        Ok(mut source) => {
+            let home = glib::home_dir();
+            let home_s = home
+                .to_str()
+                .with_context(|| "Failed to convert home directory path to UTF-8 string")?;
+            let mut items = IndexMap::new();
+            for path in parse_recent_jetbrains_projects(home_s, &mut source)? {
+                if let Some(name) = get_project_name(&path) {
+                    event!(Level::TRACE, %app_id, "Found project {} at {}", name, path);
+                    let id = format!("jetbrains-recent-project-{}-{}", app_id, path);
+                    items.insert(
+                        id,
+                        AppLaunchItem {
+                            name,
+                            uri: path.to_string(),
+                        },
+                    );
+                } else {
+                    event!(Level::TRACE, %app_id, "Skipping {}, failed to determine project name", path);
+                }
+            }
+            event!(Level::INFO, %app_id, "Found {} project(s)", items.len());
+            Ok(items)
+        }
+        Err(error) => {
+            event!(Level::DEBUG, %error, "No recent items available: {:#}", error);
+            Ok(IndexMap::new())
         }
     }
-    event!(Level::INFO, %app_id, "Found {} project(s)", items.len());
-    Ok(items)
 }
 
 /// The name to request on the bus.
