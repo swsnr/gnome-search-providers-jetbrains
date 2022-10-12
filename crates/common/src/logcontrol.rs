@@ -69,7 +69,7 @@ impl Display for LogLevel {
 }
 
 /// Log targets used by the systemd log control interface.
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum LogTarget {
     /// The regular console, i.e. stdout or stderr.
     Console,

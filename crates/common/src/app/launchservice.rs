@@ -70,7 +70,7 @@ fn get_pid(value: &glib::Variant) -> Option<pid_t> {
 }
 
 /// The desktop ID of an app.
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct AppId(String);
 
 impl Display for AppId {
