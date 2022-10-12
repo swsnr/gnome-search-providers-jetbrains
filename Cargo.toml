@@ -2,8 +2,8 @@
 name = "gnome-search-providers-jetbrains"
 description = "Gnome search providers for recent projects from Jetbrains IDEs"
 readme = "README.md"
-homepage = "https://codeberg.org/flausch/gnome-search-providers-jetbrains"
-repository = "https://codeberg.org/flausch/gnome-search-providers-jetbrains"
+homepage = "https://github.com/lunaryorn/gnome-search-providers-jetbrains"
+repository = "https://github.com/lunaryorn/gnome-search-providers-jetbrains"
 version = "1.11.2"
 license = "MPL-2.0"
 authors = ["Sebastian Wiesner <sebastian@swsnr.de>"]
@@ -18,11 +18,14 @@ regex = "^1.4"
 once_cell = "1.9.0"
 elementtree = "0.7.0"
 anyhow = "^1.0"
-clap = { version = "3.0.7", default-features = false, features=["std", "cargo"] }
+clap = { version = "3.0.7", default-features = false, features = [
+    "std",
+    "cargo",
+] }
 gnome-search-provider-common = { path = "./crates/common" }
 futures-executor = "0.3.21"
 tracing = "0.1.29"
-tracing-futures = { version = "0.2.5", default-features=false }
+tracing-futures = { version = "0.2.5", default-features = false }
 
 [dev-dependencies]
 pretty_assertions = "1.1.0"
@@ -35,8 +38,8 @@ members = ["./crates/common"]
 [package.metadata.release]
 pre-release-replacements = [
     # Update the changelog
-    { file="CHANGELOG.md", search="## \\[Unreleased\\]", replace = "## [Unreleased]\n\n## [{{version}}] – {{date}}", exactly = 1 },
-    { file="CHANGELOG.md", search="HEAD", replace = "{{tag_name}}", exactly = 1 },
-    { file="CHANGELOG.md", search="\\[Unreleased\\]: ", replace = "[Unreleased]: https://codeberg.org/flausch/gnome-search-providers-jetbrains/compare/{{tag_name}}...HEAD\n[{{version}}]: ", exactly = 1 },
+    { file = "CHANGELOG.md", search = "## \\[Unreleased\\]", replace = "## [Unreleased]\n\n## [{{version}}] – {{date}}", exactly = 1 },
+    { file = "CHANGELOG.md", search = "HEAD", replace = "{{tag_name}}", exactly = 1 },
+    { file = "CHANGELOG.md", search = "\\[Unreleased\\]: ", replace = "[Unreleased]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/compare/{{tag_name}}...HEAD\n[{{version}}]: ", exactly = 1 },
 ]
 shared-version = true
