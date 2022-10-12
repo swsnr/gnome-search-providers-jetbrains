@@ -9,6 +9,7 @@ and this project doesn't really care for versioning.
 ### Changed
 
 - Migrate back to <https://github.com/lunaryorn/gnome-search-providers-jetbrains>.
+- Update dependencies.
 
 ## [1.11.2] – 2022-05-30
 
