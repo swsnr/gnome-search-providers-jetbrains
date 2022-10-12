@@ -523,7 +523,7 @@ dependencies = [
 
 [[package]]
 name = "gnome-search-provider-common"
-version = "1.11.2"
+version = "1.12.0"
 dependencies = [
  "futures-channel",
  "futures-util",
@@ -542,7 +542,7 @@ dependencies = [
 
 [[package]]
 name = "gnome-search-providers-jetbrains"
-version = "1.11.2"
+version = "1.12.0"
 dependencies = [
  "anyhow",
  "clap",
