@@ -11,7 +11,7 @@ use tracing::field;
 use tracing::{instrument, trace};
 
 /// A recent item from the file system.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct AppLaunchItem {
     /// The human readable name
     pub name: String,
@@ -35,7 +35,7 @@ impl ScoreMatchable for AppLaunchItem {
         let uri = self.uri.to_lowercase();
         let name_score = terms.iter().try_fold(0.0, |score, term| {
             name.contains(&term.as_ref().to_lowercase())
-                .then(|| score + 10.0)
+                .then_some(score + 10.0)
                 .ok_or(())
         });
         let target = terms.iter().try_fold(0.0, |score, term| {

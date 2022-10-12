@@ -12,7 +12,7 @@ publish = false
 
 [dependencies]
 indexmap = "^1.6"
-zbus = "2.0.0"
+zbus = "3.2.0"
 tracing = "^0.1"
 tracing-log = "^0.1"
 tracing-journald = "0.3.0"
