@@ -35,7 +35,7 @@ and this project doesn't really care for versioning.
 
 ### Changed
 
-- Migrate to <https://github.com/lunaryorn/gnome-search-providers-jetbrains>.
+- Migrate to <https://codeberg.org/flausch/gnome-search-providers-jetbrains>.
 - Return proper syslog identifier from systemd log control interface.
 - Update dependencies, and remove a few redundant dependencies.
 
