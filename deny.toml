@@ -24,3 +24,6 @@ confidence-threshold = 0.8
 [sources]
 unknown-registry = "deny"
 unknown-git = "deny"
+
+[bans]
+multiple-versions = "deny"
