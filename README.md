@@ -33,10 +33,10 @@ Under the hood this is a small systemd user service which implements the [search
 
 1. Install [rust](https://www.rust-lang.org/tools/install)
 
-2. **Debian only:** Install `libgtk-3-dev` and `libsystemd-dev`.
+   **Note:** This program depends on Glib and Gio.  Building requires the corresponding headers to be installed.
 
-3. Build `make build`
-4. Install `sudo make install`
+2. Build `make build`
+3. Install `sudo make install`
    
    This installs to `/usr/local/`.
 
