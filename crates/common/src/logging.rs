@@ -258,12 +258,11 @@ fn from_fd(fd: RawFd) -> Option<String> {
 /// Check whether this process is directly connected to the systemd journal.
 ///
 /// We inspect `$JOURNAL_STREAM` and compare it against the device and inode numbers of
-/// stdout and stderr; see `systemd.exec(5)` for details.
+/// stderr; see `systemd.exec(5)` for details.
 fn connected_to_journal() -> bool {
     let var_os = std::env::var_os("JOURNAL_STREAM");
-    let var_s = var_os.as_ref().map(|os| os.to_string_lossy());
-    var_s == from_fd(std::io::stdout().as_raw_fd()).map(|s| s.into())
-        || var_s == from_fd(std::io::stderr().as_raw_fd()).map(|s| s.into())
+    var_os.as_ref().map(|os| os.to_string_lossy())
+        == from_fd(std::io::stderr().as_raw_fd()).map(|s| s.into())
 }
 
 /// Setup logging for a service.

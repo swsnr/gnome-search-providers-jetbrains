@@ -10,6 +10,12 @@ and this project doesn't really care for versioning.
 
 - Update dependencies.
 
+### Fixed
+
+- Fix automatic update to journald logging (see [GH-35]).
+
+[GH-35]: https://github.com/lunaryorn/gnome-search-providers-jetbrains/pull/35
+
 ## [1.12.0] – 2022-10-12
 
 ### Changed
