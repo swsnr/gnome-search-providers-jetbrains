@@ -25,3 +25,9 @@ unknown-git = "deny"
 
 [bans]
 multiple-versions = "deny"
+skip = [
+    # Temporarily permit concurrent-queue <2 in the tree, in addition to concurrent-queue 2.
+    # async-executor 1.5.0 updated to version 2 (semver breaking, imho), but async-io and async-channel
+    # still use version 1.
+    { name = "concurrent-queue", version = "<2" }
+]
