@@ -8,12 +8,10 @@ vulnerability = "deny"
 unmaintained = "deny"
 yanked = "deny"
 notice = "warn"
-ignore = []
 
 [licenses]
 unlicensed = "deny"
 allow = ["MIT", "Apache-2.0", "BSD-3-Clause", "MPL-2.0"]
-deny = []
 exceptions = [{ allow = ["Unicode-DFS-2016"], name = "unicode-ident" }]
 # Deny all copyleft license except the ones above.
 copyleft = "deny"
