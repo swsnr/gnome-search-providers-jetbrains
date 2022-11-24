@@ -7,8 +7,7 @@ repository.workspace = true
 authors.workspace = true
 edition.workspace = true
 license.workspace = true
-# We don't publish this to crates.io; because it's purely used for my search providers as git dependency.
-publish = false
+publish.workspace = true
 
 [dependencies]
 indexmap = "^1.6"
@@ -33,6 +32,3 @@ libc = "^0.2"
 
 [dev-dependencies]
 pretty_assertions = "^1"
-
-[package.metadata.release]
-shared-version = true
