@@ -8,8 +8,6 @@ allow-branch = ["main"]
 tag-name = "v{{version}}"
 
 # Release all at once, and share the version among all crates
-consolidate-commits = true
-consolidate-pushes = true
 shared-version = true
 
 # I prefer these messages over the default (cargo-release) messages
