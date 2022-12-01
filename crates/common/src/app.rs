@@ -38,7 +38,7 @@ mod tests {
             assert_eq!(do_match(&items, &["mdcat"]), ["foo"]);
         }
 
-        /// Regression test for https://github.com/lunaryorn/gnome-search-providers-jetbrains/issues/7
+        /// Regression test for https://github.com/swsnr/gnome-search-providers-jetbrains/issues/7
         #[test]
         fn do_not_find_undesired_items() {
             let items = vec![
