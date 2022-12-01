@@ -6,6 +6,8 @@ and this project doesn't really care for versioning.
 
 ## [Unreleased]
 
+## [1.12.2] – 2022-12-01
+
 ### Changed
 - Update repository URL to <https://github.com/swsnr/gnome-search-providers-jetbrains>.
 
@@ -195,7 +197,8 @@ and this project doesn't really care for versioning.
 
 Initial prototype in Python, with support for Toolbox IDEA CE and WebStorm.
 
-[Unreleased]: https://github.com/swsnr/gnome-search-providers-jetbrains/compare/v1.12.1...HEAD
+[Unreleased]: https://github.com/swsnr/gnome-search-providers-jetbrains/compare/v1.12.2...HEAD
+[1.12.2]: https://github.com/swsnr/gnome-search-providers-jetbrains/compare/v1.12.1...v1.12.2
 [1.12.1]: https://github.com/swsnr/gnome-search-providers-jetbrains/compare/v1.12.0...v1.12.1
 [1.12.0]: https://github.com/swsnr/gnome-search-providers-jetbrains/compare/v1.11.2...v1.12.0
 [1.11.2]: https://github.com/swsnr/gnome-search-providers-jetbrains/compare/v1.11.1...v1.11.2
