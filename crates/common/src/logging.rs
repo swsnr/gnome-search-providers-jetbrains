@@ -9,8 +9,8 @@
 use std::any::TypeId;
 use std::default::Default;
 use std::fs::File;
+use std::os::fd::{AsFd, BorrowedFd};
 use std::os::linux::fs::MetadataExt;
-use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 
 use tracing::{debug, error, warn};
 use tracing::{instrument, Subscriber};
@@ -247,12 +247,12 @@ fn create_log_subscriber(connected_to_journal: bool) -> (impl Subscriber, Tracin
     (subscriber, controller)
 }
 
-fn from_fd(fd: RawFd) -> Option<String> {
-    // SAFETY: We consume the FD here, but we move it back out later on to not consume it
-    let file = unsafe { File::from_raw_fd(fd) }; // M
-    let metadata = file.metadata().ok();
-    let _ = file.into_raw_fd();
-    metadata.map(|m| format!("{}:{}", m.st_dev(), m.st_ino()))
+fn from_fd(fd: BorrowedFd) -> Option<String> {
+    fd.try_clone_to_owned()
+        .map(File::from)
+        .and_then(|f| f.metadata())
+        .ok()
+        .map(|m| format!("{}:{}", m.st_dev(), m.st_ino()))
 }
 
 /// Check whether this process is directly connected to the systemd journal.
@@ -262,7 +262,7 @@ fn from_fd(fd: RawFd) -> Option<String> {
 fn connected_to_journal() -> bool {
     let var_os = std::env::var_os("JOURNAL_STREAM");
     var_os.as_ref().map(|os| os.to_string_lossy())
-        == from_fd(std::io::stderr().as_raw_fd()).map(|s| s.into())
+        == from_fd(std::io::stderr().as_fd()).map(|s| s.into())
 }
 
 /// Setup logging for a service.
