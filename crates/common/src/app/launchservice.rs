@@ -322,7 +322,7 @@ impl AppLaunchClient {
         self.send.send(request).map_err(|err| {
             glib::Error::new(
                 glib::FileError::Failed,
-                &format!("Failed to launch app: {}", err),
+                &format!("Failed to launch app: {err}"),
             )
         })?;
         // If the sender was dropped

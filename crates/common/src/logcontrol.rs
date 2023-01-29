@@ -64,7 +64,7 @@ impl Display for LogLevel {
             LogLevel::Info => "info",
             LogLevel::Debug => "debug",
         };
-        write!(f, "{}", level)
+        write!(f, "{level}")
     }
 }
 
@@ -128,7 +128,7 @@ impl Display for LogTarget {
             LogTarget::Null => "null",
             LogTarget::Auto => "auto",
         };
-        write!(f, "{}", target)
+        write!(f, "{target}")
     }
 }
 
@@ -189,7 +189,7 @@ impl LogControl {
     #[instrument(skip(self))]
     async fn set_log_level(&mut self, level: String) -> zbus::fdo::Result<()> {
         let level = LogLevel::try_from(level.as_str())
-            .map_err(|_| zbus::fdo::Error::InvalidArgs(format!("Unknown log level: {}", level)))?;
+            .map_err(|_| zbus::fdo::Error::InvalidArgs(format!("Unknown log level: {level}")))?;
         debug!("Changing log level to {}", level);
         self.controller.set_level(level)
     }
@@ -204,9 +204,8 @@ impl LogControl {
     #[dbus_interface(property)]
     #[instrument(skip(self))]
     async fn set_log_target(&mut self, target: String) -> zbus::fdo::Result<()> {
-        let target = LogTarget::try_from(target.as_str()).map_err(|_| {
-            zbus::fdo::Error::InvalidArgs(format!("Unknown log target: {}", target))
-        })?;
+        let target = LogTarget::try_from(target.as_str())
+            .map_err(|_| zbus::fdo::Error::InvalidArgs(format!("Unknown log target: {target}")))?;
         debug!("Changing log target to {}", target);
         self.controller.set_target(target)
     }

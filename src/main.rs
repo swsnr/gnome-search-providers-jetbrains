@@ -364,7 +364,7 @@ fn read_recent_items(
             for path in parse_recent_jetbrains_projects(home_s, &mut source)? {
                 if let Some(name) = get_project_name(&path) {
                     event!(Level::TRACE, %app_id, "Found project {} at {}", name, path);
-                    let id = format!("jetbrains-recent-project-{}-{}", app_id, path);
+                    let id = format!("jetbrains-recent-project-{app_id}-{path}");
                     items.insert(
                         id,
                         AppLaunchItem {
@@ -431,7 +431,7 @@ async fn handle_search_provider_request(
                 None => {
                     get_items(app_id.clone(), config, pool).in_current_span().await.map_err(|error| {
                         event!(Level::ERROR, %app_id, %error, "Failed to get recent items: {:#}", error);
-                        zbus::fdo::Error::Failed(format!("Failed to get recent items: {}", error))
+                        zbus::fdo::Error::Failed(format!("Failed to get recent items: {error}"))
                     }).map(Arc::new)
 
                 }
@@ -591,7 +591,7 @@ fn main() {
         let mut labels: Vec<&'static str> = PROVIDERS.iter().map(|p| p.label).collect();
         labels.sort_unstable();
         for label in labels {
-            println!("{}", label)
+            println!("{label}")
         }
     } else {
         let log_control = setup_logging_for_service();

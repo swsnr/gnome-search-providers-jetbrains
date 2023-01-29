@@ -111,7 +111,7 @@ impl AppItemSearchProvider {
         })?;
         result.map_err(|error| {
             event!(Level::ERROR, %error, "Received error from app provider: {:#}", error);
-            zbus::fdo::Error::Failed(format!("Failed to get app items: {}", error))
+            zbus::fdo::Error::Failed(format!("Failed to get app items: {error}"))
         })
     }
 }
@@ -265,8 +265,7 @@ impl AppItemSearchProvider {
         } else {
             event!(Level::ERROR, item_id, "Item not found");
             Err(zbus::fdo::Error::Failed(format!(
-                "Result {} not found",
-                item_id
+                "Result {item_id} not found"
             )))
         }
     }

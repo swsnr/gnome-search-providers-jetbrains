@@ -75,7 +75,7 @@ fn escape_name(name: &str) -> String {
                     '/' => '-'.to_string(),
                     ':' | '_' | '0'..='9' | 'a'..='z' | 'A'..='Z' => c.to_string(),
                     '.' if n > 0 => c.to_string(),
-                    _ => format!(r#"\x{:02x}"#, b),
+                    _ => format!(r#"\x{b:02x}"#),
                 }
             })
             .collect::<Vec<_>>()

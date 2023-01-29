@@ -137,7 +137,7 @@ impl LogController for TracingController {
             .reload(LevelFilter::from_level(tracing_level))
             .map_err(|err| {
                 error!("Failed to reload log level layer: {}", err);
-                zbus::fdo::Error::Failed(format!("Failed to configure log level: {}", err))
+                zbus::fdo::Error::Failed(format!("Failed to configure log level: {err}"))
             })?;
         self.level = tracing_level;
         debug!(
@@ -187,11 +187,11 @@ impl LogController for TracingController {
 
         let target = make_target_layer(tracing_target).map_err(|err| {
             error!("Failed to connect to journald: {}", err);
-            zbus::fdo::Error::Failed(format!("Failed to connect to journald: {}", err))
+            zbus::fdo::Error::Failed(format!("Failed to connect to journald: {err}"))
         })?;
         self.target_handle.reload(target).map_err(|err| {
             error!("Failed to reload target layer: {}", err);
-            zbus::fdo::Error::Failed(format!("Failed to configure logging target: {}", err))
+            zbus::fdo::Error::Failed(format!("Failed to configure logging target: {err}"))
         })?;
         self.target = tracing_target;
         Ok(())
