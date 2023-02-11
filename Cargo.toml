@@ -9,6 +9,7 @@ license.workspace = true
 authors.workspace = true
 edition.workspace = true
 publish.workspace = true
+rust-version.workspace = true
 
 [dependencies]
 regex = { version = "1.7.0", default-features = false, features = ["std", "perf"] }
@@ -48,6 +49,7 @@ version = "1.12.2"
 license = "MPL-2.0"
 authors = ["Sebastian Wiesner <sebastian@swsnr.de>"]
 edition = "2021"
+rust-version = "1.67"
 # We don't publish this to crates.io; you can't install it with cargo install
 # because you'd miss the required service and configuration files, and you
 # wouldn't want to depend on it either.
