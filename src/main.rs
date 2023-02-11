@@ -406,6 +406,7 @@ async fn get_items(
     pool.push_future(move || span_for_pool.in_scope(|| read_recent_items(config, &id_inner)))
         .with_context(|| "Failed to run task on IO thread pool".to_string())?
         .await
+        .unwrap_or_else(|panic| std::panic::resume_unwind(panic))
 }
 
 /// Handle a single search provider request.
