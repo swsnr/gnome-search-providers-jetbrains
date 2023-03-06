@@ -6,6 +6,9 @@ and this project doesn't really care for versioning.
 
 ## [Unreleased]
 
+### Fixed
+- No longer dead-lock at startup while registering interfaces.
+
 ## [1.12.3] – 2023-02-27
 
 ### Changed

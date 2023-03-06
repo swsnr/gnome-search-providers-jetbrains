@@ -532,22 +532,11 @@ async fn start_dbus_service(log_control: LogControl) -> Result<Service> {
         providers.len(),
         BUSNAME
     );
-    let connection = providers
-        .into_iter()
-        .try_fold(
-            zbus::ConnectionBuilder::session()?,
-            |b, (path, provider)| {
-                event!(
-                    Level::DEBUG,
-                    app_id = %provider.app().id(),
-                    "Serving search provider at {}",
-                    path
-                );
-                b.serve_at(path, provider)
-            },
-        )?
-        .serve_at("/org/freedesktop/LogControl1", log_control)?
-        .name(BUSNAME)?
+
+    event!(Level::DEBUG, "Connecting to session bus");
+    let connection = zbus::ConnectionBuilder::session()?
+        // .serve_at("/org/freedesktop/LogControl1", log_control)?
+        // .name(BUSNAME)?
         // We disable the internal executor because we'd like to run the connection
         // exclusively on the glib mainloop, and thus tick it manually (see below).
         .internal_executor(false)
@@ -557,6 +546,41 @@ async fn start_dbus_service(log_control: LogControl) -> Result<Service> {
 
     // Manually tick the connection on the glib mainloop to make all code in zbus run on the mainloop.
     glib::MainContext::ref_thread_default().spawn(tick(connection.clone()));
+
+    event!(
+        Level::DEBUG,
+        "Connected to session bus, registering log control interface"
+    );
+    connection
+        .object_server()
+        .at("/org/freedesktop/LogControl1", log_control)
+        .await?;
+
+    event!(
+        Level::DEBUG,
+        "Log control interface registered, registering {} search provider interfaces",
+        providers.len()
+    );
+    for (path, provider) in providers {
+        event!(
+            Level::DEBUG,
+            app_id = %provider.app().id(),
+            "Serving search provider at {}",
+            path
+        );
+        connection
+            .object_server()
+            .at(path.as_str(), provider)
+            .await
+            .with_context(|| format!("Failed to register search provider at {path}"))?;
+    }
+
+    event!(
+        Level::DEBUG,
+        "All search providers registers, acquiring bus name {}",
+        BUSNAME
+    );
+    connection.request_name(BUSNAME).await?;
 
     event!(
         Level::INFO,
