@@ -376,7 +376,7 @@ fn read_recent_items(
                     event!(Level::TRACE, %app_id, "Skipping {}, failed to determine project name", path);
                 }
             }
-            event!(Level::INFO, %app_id, "Found {} project(s)", items.len());
+            event!(Level::INFO, %app_id, "Found {} recent project(s) for app {}", items.len(), app_id);
             Ok(items)
         }
         Err(error) => {
