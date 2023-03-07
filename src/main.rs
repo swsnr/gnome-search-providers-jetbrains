@@ -502,8 +502,8 @@ async fn start_dbus_service(log_control: LogControl) -> Result<Service> {
             let (tx, rx) = mpsc::channel(8);
             let search_provider =
                 AppItemSearchProvider::new(gio_app.into(), launch_service.client(), tx);
-            // Spawn a future on Glib which reads requests from the provider and reads recent
-            // projects on a separate thread pool to avoid blocking the main loop.
+            // Move IO to a separate thread pool to avoid blocking the main loop.
+            // We use a shared pool to share two threads among all providers.
             let io_pool = glib::ThreadPool::shared(Some(2)).with_context(|| {
                 format!(
                     "Failed to create thread pool to read recent projects for app {}",
