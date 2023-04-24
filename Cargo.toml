@@ -12,16 +12,16 @@ publish.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-regex = { version = "1.7.1", default-features = false, features = ["std", "perf"] }
+regex = { version = "1.8.1", default-features = false, features = ["std", "perf"] }
 once_cell = { version = "1.17.1", default-features = false }
 elementtree = "1.2.3"
-anyhow = { version = "1.0.69", default-features = false, features = ["std", "backtrace"] }
-clap = { version = "4.1.7", default-features = false, features = [
+anyhow = { version = "1.0.70", default-features = false, features = ["std", "backtrace"] }
+clap = { version = "4.2.4", default-features = false, features = [
     "std",
     "cargo",
 ] }
 gnome-search-provider-common = { path = "./crates/common" }
-futures-executor = { version = "0.3.26", default-features = false }
+futures-executor = { version = "0.3.28", default-features = false }
 tracing = { version = "0.1.37", default-features = false, features = ["attributes"] }
 tracing-futures = { version = "0.2.5", default-features = false }
 

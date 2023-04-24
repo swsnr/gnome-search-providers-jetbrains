@@ -11,12 +11,12 @@ publish.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-indexmap = "1.9.2"
-zbus = { version = "3.6.2", default-features = false, features = ["async-io"] }
+indexmap = "1.9.3"
+zbus = { version = "3.12.0", default-features = false, features = ["async-io"] }
 tracing = { version = "0.1.37", default-features = false, features = ["attributes"] }
 tracing-log = { version = "0.1.3", default-features = false, features = ["log-tracer"] }
 tracing-journald = "0.3.0"
-tracing-subscriber = { version = "0.3.16", default-features = false, features = [
+tracing-subscriber = { version = "0.3.17", default-features = false, features = [
     "registry",
     "parking_lot",
     "env-filter",
@@ -25,11 +25,11 @@ tracing-futures = { version = "0.2.5", default-features = false, features = [
     "std-future",
     "futures-03",
 ] }
-futures-util = { version = "0.3.25", default-features = false }
-futures-channel = { version = "0.3.25", default-features = false }
-gio = { version = "0.17.0", features = ["v2_60"] }
-glib = { version = "0.17.0", features = ["log"] }
-libc = "0.2.139"
+futures-util = { version = "0.3.28", default-features = false }
+futures-channel = { version = "0.3.28", default-features = false }
+gio = { version = "0.17.9", features = ["v2_60"] }
+glib = { version = "0.17.9", features = ["log"] }
+libc = "0.2.142"
 
 [dev-dependencies]
 pretty_assertions = "1.3.0"
