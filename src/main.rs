@@ -5,6 +5,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #![deny(warnings, missing_docs, clippy::all)]
+#![forbid(unsafe_code)]
 
 //! Gnome search provider for Jetbrains products
 
