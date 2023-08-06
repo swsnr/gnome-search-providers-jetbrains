@@ -6,6 +6,9 @@ and this project doesn't really care for versioning.
 
 ## [Unreleased]
 
+### Fixed
+- Fix bindir in Makefile.
+
 ## [1.12.5] – 2023-08-06
 
 ### Changed

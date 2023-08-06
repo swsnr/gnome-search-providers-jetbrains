@@ -3,11 +3,9 @@ PREFIX = /usr/local
 
 ## Files are installed into these three base directories.
 # The path to install the service executable (gnome-search-providers-jetbrains)
-BINDIR = $(PREFIX)/bin//gnome-search-providers-jetbrains
-
+BINDIR = $(PREFIX)/bin
 # The path to install systemd user units in
 USERUNITDIR = $(PREFIX)/lib/systemd/user
-
 # The base path for dbus services and gnome-shell search providers
 DATADIR = $(PREFIX)/share
 DBUS_SERVICES_DIR = $(DATADIR)/dbus-1/services
