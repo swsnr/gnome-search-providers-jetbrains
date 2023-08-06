@@ -3,7 +3,7 @@ PREFIX = /usr/local
 
 ## Files are installed into these three base directories.
 # The path to install the service executable (gnome-search-providers-jetbrains)
-LIBEXECDIR = $(PREFIX)/lib/gnome-search-providers-jetbrains
+BINDIR = $(PREFIX)/bin//gnome-search-providers-jetbrains
 
 # The path to install systemd user units in
 USERUNITDIR = $(PREFIX)/lib/systemd/user
@@ -21,19 +21,15 @@ build:
 
 .PHONY: install
 install:
-	mkdir -p target/dbus-1 target/systemd
-	sed "s:{LIBEXECDIR}:$(LIBEXECDIR):g" "dbus-1/de.swsnr.searchprovider.Jetbrains.service" > "target/dbus-1/de.swsnr.searchprovider.Jetbrains.service"
-	sed "s:{LIBEXECDIR}:$(LIBEXECDIR):g" "systemd/gnome-search-providers-jetbrains.service" > "target/systemd/gnome-search-providers-jetbrains.service"
-
 	install -Dm644 -t $(DESTDIR)$(SEARCH_PROVIDERS_DIR) $(SEARCH_PROVIDERS)
-	install -Dm755 -t $(DESTDIR)$(LIBEXECDIR) target/release/gnome-search-providers-jetbrains
-	install -Dm644 -t $(DESTDIR)$(USERUNITDIR) target/systemd/gnome-search-providers-jetbrains.service
-	install -Dm644 -t $(DESTDIR)$(DBUS_SERVICES_DIR) target/dbus-1/de.swsnr.searchprovider.Jetbrains.service
+	install -Dm644 -t $(DESTDIR)$(USERUNITDIR) systemd/gnome-search-providers-jetbrains.service
+	install -Dm644 -t $(DESTDIR)$(DBUS_SERVICES_DIR) dbus-1/de.swsnr.searchprovider.Jetbrains.service
+	install -Dm755 -t $(DESTDIR)$(BINDIR) target/release/gnome-search-providers-jetbrains
 
 .PHONY: uninstall
 uninstall:
 	rm -f $(addprefix $(DESTDIR)$(SEARCH_PROVIDERS_DIR)/,$(notdir $(SEARCH_PROVIDERS)))
-	rm -rf $(DESTDIR)$(LIBEXECDIR)/
+	rm -rf $(DESTDIR)$(BINDIR)/
 	rm -f $(DESTDIR)$(USERUNITDIR)/gnome-search-providers-jetbrains.service
 	rm -f $(DESTDIR)$(DBUS_SERVICES_DIR)/de.swsnr.searchprovider.Jetbrains.service
 

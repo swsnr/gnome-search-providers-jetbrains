@@ -6,6 +6,10 @@ and this project doesn't really care for versioning.
 
 ## [Unreleased]
 
+### Changed
+- Update all dependencies.
+- The makefile now installs the binary to the bindir, e.g `/usr/bin/` or `/usr/local/bin/`.
+
 ## [1.12.4] – 2023-03-06
 
 ### Fixed
