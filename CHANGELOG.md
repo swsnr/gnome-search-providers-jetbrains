@@ -6,6 +6,8 @@ and this project doesn't really care for versioning.
 
 ## [Unreleased]
 
+## [1.12.5] – 2023-08-06
+
 ### Changed
 - Update all dependencies.
 - The makefile now installs the binary to the bindir, e.g `/usr/bin/` or `/usr/local/bin/`.
@@ -211,7 +213,8 @@ and this project doesn't really care for versioning.
 
 Initial prototype in Python, with support for Toolbox IDEA CE and WebStorm.
 
-[Unreleased]: https://github.com/swsnr/gnome-search-providers-jetbrains/compare/v1.12.4...HEAD
+[Unreleased]: https://github.com/swsnr/gnome-search-providers-jetbrains/compare/v1.12.5...HEAD
+[1.12.5]: https://github.com/swsnr/gnome-search-providers-jetbrains/compare/v1.12.4...v1.12.5
 [1.12.4]: https://github.com/swsnr/gnome-search-providers-jetbrains/compare/v1.12.3...v1.12.4
 [1.12.3]: https://github.com/swsnr/gnome-search-providers-jetbrains/compare/v1.12.2...v1.12.3
 [1.12.2]: https://github.com/swsnr/gnome-search-providers-jetbrains/compare/v1.12.1...v1.12.2
