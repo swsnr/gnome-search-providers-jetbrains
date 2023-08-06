@@ -6,6 +6,8 @@ and this project doesn't really care for versioning.
 
 ## [Unreleased]
 
+## [1.12.6] – 2023-08-06
+
 ### Fixed
 - Fix bindir in Makefile.
 
@@ -216,7 +218,8 @@ and this project doesn't really care for versioning.
 
 Initial prototype in Python, with support for Toolbox IDEA CE and WebStorm.
 
-[Unreleased]: https://github.com/swsnr/gnome-search-providers-jetbrains/compare/v1.12.5...HEAD
+[Unreleased]: https://github.com/swsnr/gnome-search-providers-jetbrains/compare/v1.12.6...HEAD
+[1.12.6]: https://github.com/swsnr/gnome-search-providers-jetbrains/compare/v1.12.5...v1.12.6
 [1.12.5]: https://github.com/swsnr/gnome-search-providers-jetbrains/compare/v1.12.4...v1.12.5
 [1.12.4]: https://github.com/swsnr/gnome-search-providers-jetbrains/compare/v1.12.3...v1.12.4
 [1.12.3]: https://github.com/swsnr/gnome-search-providers-jetbrains/compare/v1.12.2...v1.12.3
