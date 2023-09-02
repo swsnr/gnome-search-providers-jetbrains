@@ -6,7 +6,6 @@
 
 //! Systemd utilities.
 
-use libc::pid_t;
 use tracing::{debug, trace};
 use zbus::dbus_proxy;
 use zbus::zvariant::{OwnedObjectPath, Value};
@@ -87,25 +86,23 @@ fn escape_name(name: &str) -> String {
 ///
 /// `properties` provides the name and the metadata for the new scope.
 ///
-/// `pid` is the process ID of the process to move into a new scope.
+/// `pid` is the process ID of the process to move into a new scope. Systemd uses an unsigned integer
+/// to represent PIDs in its DBus interface, unlike the Linux system interface which used a signed
+/// `pid_t` type.
 ///
 /// Return the complete name and the DBUS object path of the new scope unit if successful.
 pub async fn start_app_scope(
     manager: &Systemd1ManagerProxy<'_>,
     properties: ScopeProperties<'_>,
-    pid: pid_t,
+    pid: u32,
 ) -> zbus::Result<(String, OwnedObjectPath)> {
     // See https://gitlab.gnome.org/jf/start-transient-unit/-/blob/117c6f32c8dc0d1f28686408f698632aa71880bc/rust/src/main.rs#L94
     // for inspiration.
     // See https://www.freedesktop.org/wiki/Software/systemd/ControlGroupInterface/ for background.
     let mut props = vec![
-        // I haven't found any documentation for the type of the PIDs property, but
-        // systemd appears to use u32 for PIDs, even though pid_t is a signed type.
-        // libgnome also uses uint32, see
-        // https://gitlab.gnome.org/GNOME/gnome-desktop/-/blob/106a729c3f98b8ee56823a0a49fa8504f78dd355/libgnome-desktop/gnome-systemd.c#L94
-        //
-        // Attempting to pass PID as pid_t directly results in a ENXIO error from systemd.
-        ("PIDs", Value::Array(vec![pid as u32].into())),
+        // I haven't found any documentation for the type of the PIDs property directly, but elsewhere
+        // in its DBus interface system always used u32 for PIDs.
+        ("PIDs", Value::Array(vec![pid].into())),
         // libgnome passes this property too, see
         // https://gitlab.gnome.org/GNOME/gnome-desktop/-/blob/106a729c3f98b8ee56823a0a49fa8504f78dd355/libgnome-desktop/gnome-systemd.c#L100
         //

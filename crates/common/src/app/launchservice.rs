@@ -12,7 +12,6 @@ use std::sync::Arc;
 
 use gio::prelude::*;
 use glib::{ControlFlow, SourceId};
-use libc::pid_t;
 use tracing::field;
 use tracing::{debug, error, info, span, trace, warn};
 use tracing::{instrument, Level, Span};
@@ -39,7 +38,7 @@ async fn move_launched_process_to_scope(
     id: &str,
     description: &str,
     scope_settings: &SystemdScopeSettings,
-    pid: pid_t,
+    pid: u32,
 ) -> Result<(String, OwnedObjectPath), zbus::Error> {
     // Gnome also strips the .desktop suffix from IDs, see
     // https://gitlab.gnome.org/GNOME/gnome-desktop/-/blob/106a729c3f98b8ee56823a0a49fa8504f78dd355/libgnome-desktop/gnome-systemd.c#L227
@@ -60,13 +59,6 @@ async fn move_launched_process_to_scope(
         pid, id, &properties
     );
     start_app_scope(&systemd, properties, pid).await
-}
-
-fn get_pid(value: &glib::Variant) -> Option<pid_t> {
-    value
-        .get::<VariantDict>()
-        .and_then(|data| data.lookup_value("pid", None))
-        .and_then(|value| value.get::<pid_t>())
 }
 
 /// The desktop ID of an app.
@@ -176,39 +168,50 @@ fn handle_launched(
     app: &gio::AppInfo,
     platform_data: &glib::Variant,
 ) {
-    match get_pid(platform_data) {
-        None => {
-            warn!(
-                "Failed to get PID of launched application from {:?}",
-                platform_data
-            );
-        }
-        Some(pid) => {
-            info!("App {} launched with PID {}", app.id().unwrap(), pid);
-            let id = app.id().unwrap().to_string();
-            let description = app.description().map_or_else(
-                || format!("app started by {}", scope_settings.started_by),
-                |value| format!("{} started by {}", value, scope_settings.started_by),
-            );
-            glib::MainContext::ref_thread_default().spawn(async move {
-                let result = move_launched_process_to_scope(
-                    &connection,
-                    &id,
-                    &description,
-                    &scope_settings,
-                    pid,
-                )
-                    .await;
-                match result {
-                    Err(err) => {
-                        error!("Failed to move running process {} of app {} into new systemd scope: {}", pid, id, err);
-                    },
-                    Ok((name, path)) => {
-                        info!("Moved running process {} of app {} into new systemd scope {} at {}",pid, id, &name, path.into_inner());
-                    },
-                };
-            }.in_current_span());
-        }
+    match platform_data.get::<VariantDict>() {
+        None => error!("platform_data not a dictionary, but {:?}", platform_data),
+        // The type of the pid property doesn't seem to be documented anywhere, but variant type
+        // errors indicate that the type is "i", i.e.gint32.
+        //
+        // See https://docs.gtk.org/glib/gvariant-format-strings.html#numeric-types
+        Some(data) => match data.lookup::<i32>("pid") {
+            Err(type_error) => {
+                error!(
+                    "platform_data.pid had type {:?}, but expected {:?}",
+                    type_error.actual, type_error.expected
+                );
+            }
+            Ok(None) => {
+                warn!("pid missing in platform_data {:?}", platform_data);
+            }
+            Ok(Some(pid)) => {
+                info!("App {} launched with PID {}", app.id().unwrap(), pid);
+                let id = app.id().unwrap().to_string();
+                let description = app.description().map_or_else(
+                    || format!("app started by {}", scope_settings.started_by),
+                    |value| format!("{} started by {}", value, scope_settings.started_by),
+                );
+                glib::MainContext::ref_thread_default().spawn(async move {
+                    let result = move_launched_process_to_scope(
+                        &connection,
+                        &id,
+                        &description,
+                        &scope_settings,
+                        // Systemd uses u32 to represent PIDs, so let's cast.
+                        pid as u32,
+                    )
+                        .await;
+                    match result {
+                        Err(err) => {
+                            error!("Failed to move running process {} of app {} into new systemd scope: {}", pid, id, err);
+                        },
+                        Ok((name, path)) => {
+                            info!("Moved running process {} of app {} into new systemd scope {} at {}",pid, id, &name, path.into_inner());
+                        },
+                    };
+                }.in_current_span());
+            }
+        },
     }
 }
 
