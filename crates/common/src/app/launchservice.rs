@@ -11,7 +11,7 @@ use std::fmt::{Display, Formatter};
 use std::sync::Arc;
 
 use gio::prelude::*;
-use glib::SourceId;
+use glib::{ControlFlow, SourceId};
 use libc::pid_t;
 use tracing::field;
 use tracing::{debug, error, info, span, trace, warn};
@@ -287,7 +287,7 @@ impl AppLaunchService {
         let client = self.client();
         let source = self.recv.attach(None, move |request: AppLaunchRequest| {
             handle_launch(launch_context.clone(), request);
-            glib::Continue(true)
+            ControlFlow::Continue
         });
         (client, source)
     }

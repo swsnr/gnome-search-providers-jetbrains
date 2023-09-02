@@ -6,6 +6,7 @@
 
 //! Mainloop utilities for dbus serch providers.
 
+use glib::ControlFlow;
 use tracing::{debug, trace};
 
 /// Create a simple main loop on `context`.
@@ -18,7 +19,7 @@ pub fn create_main_loop(context: &glib::MainContext) -> glib::MainLoop {
         glib::clone!(@strong mainloop =>  move || {
             debug!("Terminated, quitting mainloop");
             mainloop.quit();
-            glib::Continue(false)
+            ControlFlow::Break
         }),
     );
 
@@ -28,7 +29,7 @@ pub fn create_main_loop(context: &glib::MainContext) -> glib::MainLoop {
         glib::clone!(@strong mainloop =>  move || {
             debug!("Interrupted, quitting mainloop");
             mainloop.quit();
-            glib::Continue(false)
+            ControlFlow::Break
         }),
     );
 
