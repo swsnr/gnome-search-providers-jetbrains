@@ -17,7 +17,7 @@ pub use provider::{AppItemSearchProvider, AppItemSearchRequest};
 #[cfg(test)]
 mod tests {
     mod search {
-        use pretty_assertions::assert_eq;
+        use similar_asserts::assert_eq;
 
         use crate::app::AppLaunchItem;
         use crate::matching::find_matching_items;
