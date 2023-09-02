@@ -731,33 +731,29 @@ mod tests {
 
         fn load_all_provider_files() -> Result<Vec<ProviderFile>> {
             let mut providers = Vec::new();
-            let ini_files = globwalk::GlobWalkerBuilder::new(
-                Path::new(env!("CARGO_MANIFEST_DIR")).join("providers"),
-                "*.ini",
-            )
-            .build()
-            .unwrap();
-            for entry in ini_files {
-                let filepath = entry.unwrap().into_path();
+            let provider_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("providers");
+            for entry in std::fs::read_dir(provider_dir).unwrap() {
+                let path = entry.unwrap().path();
+                if path.extension().unwrap() != "ini" {
+                    continue;
+                }
                 let mut ini = configparser::ini::Ini::new();
-                ini.load(&filepath).map_err(|s| {
-                    anyhow!("Failed to parse ini file at {}: {}", filepath.display(), s)
+                ini.load(&path).map_err(|s| {
+                    anyhow!("Failed to parse ini file at {}: {}", path.display(), s)
                 })?;
                 let provider = ProviderFile {
                     desktop_id: ini
                         .get("Shell Search Provider", "DesktopId")
-                        .with_context(|| format!("DesktopId missing in {}", &filepath.display()))?,
+                        .with_context(|| format!("DesktopId missing in {}", &path.display()))?,
                     object_path: ini
                         .get("Shell Search Provider", "ObjectPath")
-                        .with_context(|| {
-                            format!("ObjectPath missing in {}", &filepath.display())
-                        })?,
+                        .with_context(|| format!("ObjectPath missing in {}", &path.display()))?,
                     bus_name: ini
                         .get("Shell Search Provider", "BusName")
-                        .with_context(|| format!("BusName missing in {}", &filepath.display()))?,
+                        .with_context(|| format!("BusName missing in {}", &path.display()))?,
                     version: ini
                         .get("Shell Search Provider", "Version")
-                        .with_context(|| format!("Version missing in {}", &filepath.display()))?,
+                        .with_context(|| format!("Version missing in {}", &path.display()))?,
                 };
                 providers.push(provider);
             }
