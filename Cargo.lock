@@ -734,7 +734,6 @@ dependencies = [
  "futures-executor",
  "globwalk",
  "gnome-search-provider-common",
- "once_cell",
  "regex",
  "similar-asserts",
  "tracing",

@@ -18,7 +18,7 @@ use std::sync::Arc;
 
 use anyhow::{anyhow, Context, Result};
 use elementtree::Element;
-use once_cell::sync::OnceCell;
+use glib::once_cell::sync::OnceCell;
 use regex::Regex;
 use tracing::{event, instrument, Level, Span};
 use tracing_futures::Instrument;
