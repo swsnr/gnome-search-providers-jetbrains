@@ -8,6 +8,11 @@ and this project doesn't really care for versioning.
 
 ### Changed
 - Update all dependencies.
+- Do not update recent projects when starting a search; instead update all recent projects at startup or when explicitly requested over DBus (see [GH-48]).
+  This speeds up initial search and makes sure the search provider answers in time.
+- `systemctl --user reload gnome-search-providers-jetbrains.service` refreshes all recent projects (see [GH-48]).
+
+[GH-48]: https://github.com/swsnr/gnome-search-providers-jetbrains/pull/48
 
 ## [1.12.6] – 2023-08-06
 

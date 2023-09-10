@@ -20,20 +20,20 @@ use zbus::zvariant;
 use crate::app::*;
 use crate::matching::*;
 
+mod extensions;
+pub use extensions::SearchProviderExtensions;
+
 /// Requests by the search provider.
 #[derive(Debug)]
 pub enum AppItemSearchRequest {
     /// Invalidate the list of items for the app.
     ///
     /// Pass a span for tracing.
-    Invalidate(Span),
+    RefreshItems(Span),
     /// Get app items.
     ///
     /// The first element is a span for tracing, the second the return channel for the items.
-    GetItems(
-        Span,
-        oneshot::Sender<zbus::fdo::Result<Arc<IndexMap<String, AppLaunchItem>>>>,
-    ),
+    GetItems(Span, oneshot::Sender<Arc<IndexMap<String, AppLaunchItem>>>),
 }
 
 impl AppItemSearchRequest {
@@ -41,7 +41,7 @@ impl AppItemSearchRequest {
     pub fn name(&self) -> &'static str {
         use AppItemSearchRequest::*;
         match self {
-            Invalidate(_) => "Invalidate",
+            RefreshItems(_) => "Invalidate",
             GetItems(_, _) => "GetItems",
         }
     }
@@ -50,7 +50,7 @@ impl AppItemSearchRequest {
     pub fn span(&self) -> &tracing::Span {
         use AppItemSearchRequest::*;
         match self {
-            Invalidate(span) => span,
+            RefreshItems(span) => span,
             GetItems(span, _) => span,
         }
     }
@@ -67,8 +67,8 @@ pub struct AppItemSearchProvider {
 impl AppItemSearchProvider {
     /// Create a new search provider for recent items of `app`.
     ///
-    /// `launcher` is used to launch applications with Gio on the main thread, and `buffer`
-    ///
+    /// `launcher` is used to launch applications with Gio on the main thread, and `sender` is used
+    /// to talk to the actual search service implementation.
     pub fn new(
         app: App,
         launcher: AppLaunchClient,
@@ -109,10 +109,7 @@ impl AppItemSearchProvider {
                 "Failed to request app items, app provider dropped".to_string(),
             )
         })?;
-        result.map_err(|error| {
-            event!(Level::ERROR, %error, "Received error from app provider: {:#}", error);
-            zbus::fdo::Error::Failed(format!("Failed to get app items: {error}"))
-        })
+        Ok(result)
     }
 }
 
@@ -129,18 +126,6 @@ impl AppItemSearchProvider {
     #[instrument(skip(self), fields(app_id = %self.app.id()))]
     async fn get_initial_result_set(&mut self, terms: Vec<&str>) -> zbus::fdo::Result<Vec<String>> {
         event!(Level::DEBUG, "Searching for {:?}", terms);
-        event!(Level::DEBUG, "Refreshing items for new search");
-        self.sender
-            .feed(AppItemSearchRequest::Invalidate(Span::current()))
-            .await
-            .map_err(|error| {
-                event!(
-                Level::ERROR,
-                %error,
-                "Failed to send request to invalidate search items: {}", error
-                );
-                zbus::fdo::Error::Failed("Failed to invalidate search items".to_string())
-            })?;
         let items = self.get_items().await?;
         let ids = find_matching_items(items.iter(), terms.as_slice())
             .into_iter()
