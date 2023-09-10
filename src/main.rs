@@ -536,10 +536,11 @@ async fn start_dbus_service(log_control: LogControl) -> Result<Service> {
 
     event!(Level::DEBUG, "Connecting to session bus");
     let connection = zbus::ConnectionBuilder::session()?
-        // .serve_at("/org/freedesktop/LogControl1", log_control)?
-        // .name(BUSNAME)?
         // We disable the internal executor because we'd like to run the connection
         // exclusively on the glib mainloop, and thus tick it manually (see below).
+        // Since the executor needs to start ticking for everything, we can't use any of the other
+        // builder methods here (e.g. serve_at, name, etc.) because these would never complete because
+        // the executor only starts ticking after we have created the connection.
         .internal_executor(false)
         .build()
         .await
