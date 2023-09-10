@@ -10,7 +10,7 @@ use std::fmt::Debug;
 
 use futures_channel::mpsc;
 use futures_util::SinkExt;
-use tracing::{event, instrument, Level, Span};
+use tracing::{event, instrument, Instrument, Level, Span};
 use zbus::dbus_interface;
 
 use crate::app::{AppId, AppItemSearchRequest};
@@ -39,9 +39,10 @@ impl SearchProviderExtensions {
     /// Refresh all items in the search provider.
     #[instrument(skip(self), fields(app_id = %self.app_id))]
     pub async fn refresh(&mut self) -> zbus::fdo::Result<()> {
-        event!(Level::DEBUG, app_id=%self.app_id, "Refreshing items for new search in app {}", self.app_id);
+        event!(Level::DEBUG, app_id=%self.app_id, "Refreshing items of app {}", self.app_id);
         self.sender
             .send(AppItemSearchRequest::RefreshItems(Span::current()))
+            .in_current_span()
             .await
             .map_err(|error| {
                 event!(

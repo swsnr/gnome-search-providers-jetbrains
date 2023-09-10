@@ -346,7 +346,7 @@ fn read_recent_items(
     config: &ConfigLocation<'_>,
     app_id: &AppId,
 ) -> Result<IndexMap<String, AppLaunchItem>> {
-    event!(Level::INFO, %app_id, "Searching recent projects");
+    event!(Level::INFO, %app_id, "Reading recents projects of {}", app_id);
     match config
         .find_latest_recent_projects_file(&glib::user_config_dir())
         .and_then(|projects_file| {
@@ -507,26 +507,34 @@ async fn start_dbus_service(log_control: LogControl) -> Result<Service> {
     for provider in PROVIDERS {
         if let Some(gio_app) = gio::DesktopAppInfo::new(provider.desktop_id) {
             event!(Level::INFO, "Found app {}", provider.desktop_id);
+            let app_id = AppId::from(&gio_app);
+
             let (tx, rx) = mpsc::channel(8);
-            search_services.push(((&gio_app).into(), tx.clone()));
-            let search_provider_extensions =
-                SearchProviderExtensions::new((&gio_app).into(), tx.clone());
-            let search_provider =
-                AppItemSearchProvider::new(gio_app.into(), launch_service.client(), tx);
+            search_services.push((app_id.clone(), tx.clone()));
+
+            event!(Level::DEBUG, %app_id, "Starting search service for {}", &app_id);
             // Move IO to a separate thread pool to avoid blocking the main loop.
             // We use a shared pool to share two threads among all providers.
             let io_pool = glib::ThreadPool::shared(Some(2)).with_context(|| {
                 format!(
                     "Failed to create thread pool to read recent projects for app {}",
-                    search_provider.app().id()
+                    &app_id
                 )
             })?;
             glib::MainContext::ref_thread_default().spawn(serve_search_provider(
-                search_provider.app().id().clone(),
+                app_id.clone(),
                 &provider.config,
                 io_pool,
                 rx,
             ));
+
+            let mut search_provider_extensions =
+                SearchProviderExtensions::new((&gio_app).into(), tx.clone());
+            let search_provider =
+                AppItemSearchProvider::new(gio_app.into(), launch_service.client(), tx);
+
+            let _ = search_provider_extensions.refresh().in_current_span().await;
+
             providers.push((
                 provider.objpath(),
                 search_provider,
@@ -542,76 +550,40 @@ async fn start_dbus_service(log_control: LogControl) -> Result<Service> {
     }
 
     event!(
-        Level::INFO,
-        "Registering {} search provider(s) on {}",
+        Level::DEBUG,
+        "Connecting to session bus, registering interfaces for {} providers, and acquiring {}",
         providers.len(),
         BUSNAME
     );
-
-    event!(Level::DEBUG, "Connecting to session bus");
-    let connection = zbus::ConnectionBuilder::session()?
-        // We disable the internal executor because we'd like to run the connection
-        // exclusively on the glib mainloop, and thus tick it manually (see below).
-        // Since the executor needs to start ticking for everything, we can't use any of the other
-        // builder methods here (e.g. serve_at, name, etc.) because these would never complete because
-        // the executor only starts ticking after we have created the connection.
-        .internal_executor(false)
+    let service_interface = ServiceInterface::new(search_services);
+    // We disable the internal executor because we'd like to run the connection
+    // exclusively on the glib mainloop, and thus tick it manually (see below).
+    let connection = providers
+        .into_iter()
+        .try_fold(
+            zbus::ConnectionBuilder::session()?.internal_executor(false),
+            |builder, (path, provider, extensions)| {
+                event!(
+                    Level::DEBUG,
+                    app_id = %provider.app().id(),
+                    "Serving search provider for {} at {}",
+                    provider.app().id(),
+                    &path
+                );
+                builder
+                    .serve_at(path.clone(), provider)?
+                    .serve_at(path, extensions)
+            },
+        )?
+        .serve_at("/", service_interface)?
+        .serve_at("/org/freedesktop/LogControl1", log_control)?
+        .name(BUSNAME)?
         .build()
         .await
         .with_context(|| "Failed to connect to session bus")?;
 
     // Manually tick the connection on the glib mainloop to make all code in zbus run on the mainloop.
     glib::MainContext::ref_thread_default().spawn(tick(connection.clone()));
-
-    event!(
-        Level::DEBUG,
-        "Connected to session bus, registering log control interface"
-    );
-    connection
-        .object_server()
-        .at("/org/freedesktop/LogControl1", log_control)
-        .await?;
-
-    event!(
-        Level::DEBUG,
-        "Log control interface registered, registering global service interface"
-    );
-    let service_interface = ServiceInterface::new(search_services);
-    connection
-        .object_server()
-        .at("/", service_interface)
-        .await
-        .with_context(|| "Failed to register global service interface at /".to_string())?;
-
-    event!(
-        Level::DEBUG,
-        "Global service interface registered, registering {} search provider interfaces",
-        providers.len()
-    );
-    for (path, provider, mut extensions) in providers {
-        let app_id = provider.app().id();
-        event!(Level::DEBUG, %app_id, "Refreshing items of provider for app {}", app_id);
-        let _ = extensions.refresh().in_current_span().await;
-        event!(Level::DEBUG, %app_id, "Serving search provider extensions at {}", path);
-        connection
-            .object_server()
-            .at(path.as_str(), extensions)
-            .await
-            .with_context(|| format!("Failed to register search provider extensions at {path}"))?;
-        event!(Level::DEBUG, %app_id, "Serving search provider at {}", path);
-        connection
-            .object_server()
-            .at(path.as_str(), provider)
-            .await
-            .with_context(|| format!("Failed to register search provider at {path}"))?;
-    }
-
-    event!(
-        Level::DEBUG,
-        "All search providers registers, acquiring bus name {}",
-        BUSNAME
-    );
-    connection.request_name(BUSNAME).await?;
 
     event!(
         Level::INFO,
