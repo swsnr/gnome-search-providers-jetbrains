@@ -41,7 +41,7 @@ impl AppItemSearchRequest {
     pub fn name(&self) -> &'static str {
         use AppItemSearchRequest::*;
         match self {
-            RefreshItems(_) => "Invalidate",
+            RefreshItems(_) => "RefreshItems",
             GetItems(_, _) => "GetItems",
         }
     }
