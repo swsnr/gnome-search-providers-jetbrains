@@ -31,6 +31,7 @@ use gnome_search_provider_common::gio::glib;
 use gnome_search_provider_common::logging::*;
 use gnome_search_provider_common::mainloop::*;
 use gnome_search_provider_common::matching::*;
+use gnome_search_provider_common::serviceinterface::ServiceInterface;
 use gnome_search_provider_common::zbus;
 
 /// Read paths of all recent projects from the given `reader`.
@@ -422,26 +423,31 @@ async fn handle_search_provider_request(
     request: AppItemSearchRequest,
 ) -> Option<Arc<IndexMap<String, AppLaunchItem>>> {
     match request {
-        AppItemSearchRequest::Invalidate(_) => {
-            if items.is_some() {
-                event!(Level::DEBUG, %app_id, "Invalidating cached projects");
+        AppItemSearchRequest::RefreshItems(span) => {
+            span.in_scope(|| {
+                event!(Level::DEBUG, %app_id, "Updating items");
+            });
+            let result = get_items(app_id.clone(), config, pool)
+                .instrument(span.clone())
+                .await;
+            match result {
+                Ok(items) => Some(Arc::new(items)),
+                Err(error) => span.in_scope(|| {
+                    event!(Level::ERROR, %app_id, %error, "Failed to get recent items: {:#}", error);
+                    None
+                })
             }
-            None
         }
-        AppItemSearchRequest::GetItems(_, respond_to) => {
-            let reply = match items {
-                None => {
-                    get_items(app_id.clone(), config, pool).in_current_span().await.map_err(|error| {
-                        event!(Level::ERROR, %app_id, %error, "Failed to get recent items: {:#}", error);
-                        zbus::fdo::Error::Failed(format!("Failed to get recent items: {error}"))
-                    }).map(Arc::new)
-
-                }
-                Some(ref items) => Ok(Arc::clone(items)),
+        AppItemSearchRequest::GetItems(span, respond_to) => {
+            let result = match &items {
+                None => respond_to.send(Arc::new(IndexMap::new())),
+                Some(items) => respond_to.send(items.clone()),
             };
-            let items = reply.as_ref().map(|a| a.clone()).ok();
-            // We don't care if the receiver was dropped before we could answer it.
-            let _ = respond_to.send(reply);
+            if result.is_err() {
+                span.in_scope(|| {
+                    event!(Level::ERROR, %app_id, "Cannot answer GetItems request, remote side closed prematurely");
+                })
+            }
             items
         }
     }
@@ -497,10 +503,14 @@ async fn start_dbus_service(log_control: LogControl) -> Result<Service> {
     let launch_service = AppLaunchService::new();
 
     let mut providers = Vec::with_capacity(PROVIDERS.len());
+    let mut search_services = Vec::with_capacity(PROVIDERS.len());
     for provider in PROVIDERS {
         if let Some(gio_app) = gio::DesktopAppInfo::new(provider.desktop_id) {
             event!(Level::INFO, "Found app {}", provider.desktop_id);
             let (tx, rx) = mpsc::channel(8);
+            search_services.push(((&gio_app).into(), tx.clone()));
+            let search_provider_extensions =
+                SearchProviderExtensions::new((&gio_app).into(), tx.clone());
             let search_provider =
                 AppItemSearchProvider::new(gio_app.into(), launch_service.client(), tx);
             // Move IO to a separate thread pool to avoid blocking the main loop.
@@ -517,7 +527,11 @@ async fn start_dbus_service(log_control: LogControl) -> Result<Service> {
                 io_pool,
                 rx,
             ));
-            providers.push((provider.objpath(), search_provider));
+            providers.push((
+                provider.objpath(),
+                search_provider,
+                search_provider_extensions,
+            ));
         } else {
             event!(
                 Level::DEBUG,
@@ -560,16 +574,31 @@ async fn start_dbus_service(log_control: LogControl) -> Result<Service> {
 
     event!(
         Level::DEBUG,
-        "Log control interface registered, registering {} search provider interfaces",
+        "Log control interface registered, registering global service interface"
+    );
+    let service_interface = ServiceInterface::new(search_services);
+    connection
+        .object_server()
+        .at("/", service_interface)
+        .await
+        .with_context(|| "Failed to register global service interface at /".to_string())?;
+
+    event!(
+        Level::DEBUG,
+        "Global service interface registered, registering {} search provider interfaces",
         providers.len()
     );
-    for (path, provider) in providers {
-        event!(
-            Level::DEBUG,
-            app_id = %provider.app().id(),
-            "Serving search provider at {}",
-            path
-        );
+    for (path, provider, mut extensions) in providers {
+        let app_id = provider.app().id();
+        event!(Level::DEBUG, %app_id, "Refreshing items of provider for app {}", app_id);
+        let _ = extensions.refresh().in_current_span().await;
+        event!(Level::DEBUG, %app_id, "Serving search provider extensions at {}", path);
+        connection
+            .object_server()
+            .at(path.as_str(), extensions)
+            .await
+            .with_context(|| format!("Failed to register search provider extensions at {path}"))?;
+        event!(Level::DEBUG, %app_id, "Serving search provider at {}", path);
         connection
             .object_server()
             .at(path.as_str(), provider)
