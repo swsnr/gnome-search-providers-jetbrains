@@ -6,6 +6,8 @@ and this project doesn't really care for versioning.
 
 ## [Unreleased]
 
+## [1.13.0] – 2023-09-10
+
 ### Changed
 - Update all dependencies.
 - Do not update recent projects when starting a search; instead update all recent projects at startup or when explicitly requested over DBus (see [GH-48]).
@@ -226,7 +228,8 @@ and this project doesn't really care for versioning.
 
 Initial prototype in Python, with support for Toolbox IDEA CE and WebStorm.
 
-[Unreleased]: https://github.com/swsnr/gnome-search-providers-jetbrains/compare/v1.12.6...HEAD
+[Unreleased]: https://github.com/swsnr/gnome-search-providers-jetbrains/compare/v1.13.0...HEAD
+[1.13.0]: https://github.com/swsnr/gnome-search-providers-jetbrains/compare/v1.12.6...v1.13.0
 [1.12.6]: https://github.com/swsnr/gnome-search-providers-jetbrains/compare/v1.12.5...v1.12.6
 [1.12.5]: https://github.com/swsnr/gnome-search-providers-jetbrains/compare/v1.12.4...v1.12.5
 [1.12.4]: https://github.com/swsnr/gnome-search-providers-jetbrains/compare/v1.12.3...v1.12.4
