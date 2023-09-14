@@ -6,6 +6,8 @@ and this project doesn't really care for versioning.
 
 ## [Unreleased]
 
+## [1.14.0] – 2023-09-14
+
 ### Added
 - Add support for RustRover (see [GH-49]).
 
@@ -234,7 +236,8 @@ and this project doesn't really care for versioning.
 
 Initial prototype in Python, with support for Toolbox IDEA CE and WebStorm.
 
-[Unreleased]: https://github.com/swsnr/gnome-search-providers-jetbrains/compare/v1.13.0...HEAD
+[Unreleased]: https://github.com/swsnr/gnome-search-providers-jetbrains/compare/v1.14.0...HEAD
+[1.14.0]: https://github.com/swsnr/gnome-search-providers-jetbrains/compare/v1.13.0...v1.14.0
 [1.13.0]: https://github.com/swsnr/gnome-search-providers-jetbrains/compare/v1.12.6...v1.13.0
 [1.12.6]: https://github.com/swsnr/gnome-search-providers-jetbrains/compare/v1.12.5...v1.12.6
 [1.12.5]: https://github.com/swsnr/gnome-search-providers-jetbrains/compare/v1.12.4...v1.12.5
