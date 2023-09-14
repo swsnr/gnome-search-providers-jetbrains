@@ -6,6 +6,12 @@ and this project doesn't really care for versioning.
 
 ## [Unreleased]
 
+### Added
+- Add support for RustRover (see [GH-49]).
+
+[GH-49]: https://github.com/swsnr/gnome-search-providers-jetbrains/pull/49
+
+
 ## [1.13.0] – 2023-09-10
 
 ### Changed
