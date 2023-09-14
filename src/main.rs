@@ -320,6 +320,16 @@ const PROVIDERS: &[ProviderDefinition] = &[
         },
     },
     ProviderDefinition {
+        label: "RustRover (toolbox)",
+        desktop_id: "jetbrains-rustrover.desktop",
+        relative_obj_path: "toolbox/rustrover",
+        config: ConfigLocation {
+            vendor_dir: "JetBrains",
+            config_prefix: "RustRover",
+            projects_filename: "recentProjects.xml",
+        },
+    },
+    ProviderDefinition {
         label: "Android Studio (toolbox)",
         desktop_id: "jetbrains-studio.desktop",
         relative_obj_path: "toolbox/studio",

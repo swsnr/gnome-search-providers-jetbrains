@@ -17,6 +17,7 @@ Supports
 - PyCharm (toolbox)
 - Rider (toolbox)
 - RubyMine (toolbox)
+- RustRover (toolbox)
 - WebStorm (toolbox)
 
 Under the hood this is a small systemd user service which implements the [search provider][1] DBus API and exposes recent projects from Jetbrains IDEs.
