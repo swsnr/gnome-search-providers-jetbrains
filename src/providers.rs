@@ -151,7 +151,10 @@ pub const PROVIDERS: &[ProviderDefinition] = &[
 
 #[cfg(test)]
 mod tests {
+    use similar_asserts::assert_eq;
     use std::collections::HashSet;
+    use std::fs::File;
+    use std::io::{BufRead, BufReader};
     use std::path::Path;
 
     use anyhow::{anyhow, Context, Result};
@@ -238,5 +241,21 @@ mod tests {
             paths.insert(provider.objpath());
         }
         assert_eq!(PROVIDERS.len(), paths.len());
+    }
+
+    #[test]
+    fn all_providers_are_in_readme() {
+        let readme = Path::new(env!("CARGO_MANIFEST_DIR")).join("README.md");
+        let lines: Vec<String> = BufReader::new(File::open(readme).unwrap())
+            .lines()
+            .map(|l| l.unwrap())
+            .skip_while(|l| l != "Supports")
+            .skip(2)
+            .take_while(|l| !l.is_empty())
+            .collect();
+        let mut expected_lines: Vec<String> =
+            PROVIDERS.iter().map(|p| format!("- {}", p.label)).collect();
+        expected_lines.sort();
+        assert_eq!(lines, expected_lines);
     }
 }
