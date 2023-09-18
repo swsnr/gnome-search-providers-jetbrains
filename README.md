@@ -43,10 +43,16 @@ Under the hood this is a small systemd user service which implements the [search
 
    **Note:** You really do need to install as `root`, system-wide.
    A per-user installation to `$HOME` does not work as of Gnome 40, because Gnome shell doesn't load search providers from `$HOME` (see <https://gitlab.gnome.org/GNOME/gnome-shell/-/issues/3060>).
+4. Compile gschema `sudo make schema-compile`. Rebuilds the gschema files in order to be detected by gio.
 
 ## Uninstallation 
 
 To uninstall use `sudo make uninstall`.
+
+## Configuration
+
+In order to disable the search for certain IDEs, run `dconf write /org/gnome/desktop/search-providers/jetbrains/disabled "['jetbrains-idea.desktop', 'jetbrains-rustrover.desktop']"`.
+This command will disable the search for IDEA and RustRover. 
 
 ## Debugging
 
