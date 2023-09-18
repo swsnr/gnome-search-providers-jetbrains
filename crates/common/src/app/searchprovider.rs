@@ -8,7 +8,8 @@
 
 use std::collections::HashMap;
 use std::fmt::Debug;
-use std::sync::Arc;
+use std::ops::Deref;
+use std::sync::{Arc, TryLockError};
 
 use futures_channel::{mpsc, oneshot};
 use futures_util::SinkExt;
@@ -87,7 +88,22 @@ impl AppItemSearchProvider {
     }
 
     /// Get items from the provider.
+    /// If the app is disabled in the gio settings, it will return an empty result.
     async fn get_items(&mut self) -> zbus::fdo::Result<Arc<IndexMap<String, AppLaunchItem>>> {
+        event!(Level::DEBUG, "Acquire lock for disabled setting");
+        {
+            let lock = self.app.disabled.try_lock();
+            match lock {
+                Ok(guard) => {
+                    if *guard.deref() {
+                        event!(Level::INFO, "Search provider for app {} is disabled, skipping", self.app);
+                        return Ok(Arc::new(IndexMap::new()));
+                    }
+                }
+                Err(TryLockError::WouldBlock) => event!(Level::WARN, "Something else already holds a lock for app {}, search provider will search for projects", self.app),
+                Err(TryLockError::Poisoned(_)) => event!(Level::WARN, "Lock for app {} is poisoned, search provider will search for projects", self.app)
+            }
+        }
         let (tx, rx) = oneshot::channel();
         self.sender
             .send(AppItemSearchRequest::GetItems(Span::current(), tx))

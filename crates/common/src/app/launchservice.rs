@@ -8,7 +8,7 @@
 
 use std::convert::TryFrom;
 use std::fmt::{Display, Formatter};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use gio::prelude::*;
 use glib::{ControlFlow, SourceId};
@@ -109,6 +109,8 @@ pub struct App {
     id: AppId,
     /// The icon to use for this app
     icon: String,
+    /// Whether this app is currently disabled or not
+    pub disabled: Arc<Mutex<bool>>,
 }
 
 impl App {
@@ -130,7 +132,15 @@ impl From<gio::DesktopAppInfo> for App {
             icon: IconExt::to_string(&app.icon().unwrap())
                 .unwrap()
                 .to_string(),
+            disabled: Arc::new(Mutex::new(false)),
         }
+    }
+}
+
+impl Display for App {
+    /// Format the app using its id.
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.id.0.as_str())
     }
 }
 

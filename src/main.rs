@@ -12,9 +12,10 @@
 use std::ffi::OsStr;
 use std::fs::File;
 use std::io::Read;
+use std::mem::forget;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use anyhow::{anyhow, Context, Result};
 use elementtree::Element;
@@ -27,7 +28,8 @@ use gnome_search_provider_common::app::*;
 use gnome_search_provider_common::futures_channel::mpsc;
 use gnome_search_provider_common::futures_util::StreamExt;
 use gnome_search_provider_common::gio;
-use gnome_search_provider_common::gio::glib;
+use gnome_search_provider_common::gio::prelude::{SettingsExt, SettingsExtManual};
+use gnome_search_provider_common::gio::{glib, Settings};
 use gnome_search_provider_common::logging::*;
 use gnome_search_provider_common::mainloop::*;
 use gnome_search_provider_common::matching::*;
@@ -514,6 +516,11 @@ async fn start_dbus_service(log_control: LogControl) -> Result<Service> {
 
     let mut providers = Vec::with_capacity(PROVIDERS.len());
     let mut search_services = Vec::with_capacity(PROVIDERS.len());
+    let settings = Settings::new("de.swsnr.searchprovider.jetbrains");
+    let disabled_apps: Vec<String> = SettingsExtManual::get(&settings, "disabled");
+    event!(Level::INFO, "Disabled apps are: {:?}", disabled_apps);
+    let mut app_disabled_state: Vec<(String, Arc<Mutex<bool>>)> =
+        Vec::with_capacity(PROVIDERS.len());
     for provider in PROVIDERS {
         if let Some(gio_app) = gio::DesktopAppInfo::new(provider.desktop_id) {
             event!(Level::INFO, "Found app {}", provider.desktop_id);
@@ -540,9 +547,28 @@ async fn start_dbus_service(log_control: LogControl) -> Result<Service> {
 
             let mut search_provider_extensions =
                 SearchProviderExtensions::new((&gio_app).into(), tx.clone());
-            let search_provider =
-                AppItemSearchProvider::new(gio_app.into(), launch_service.client(), tx);
-
+            let app: App = gio_app.into();
+            let mut lock = app.disabled.lock();
+            match lock {
+                Ok(ref mut guard) => {
+                    let disabled = disabled_apps.contains(&app_id.to_string());
+                    event!(
+                        Level::INFO,
+                        "App {} is now {}",
+                        app_id,
+                        if disabled { "disabled" } else { "enabled" }
+                    );
+                    **guard = disabled
+                }
+                Err(_) => event!(
+                    Level::WARN,
+                    "Cannot acquire disable lock for app {}, app will be searched for projects",
+                    app_id
+                ),
+            }
+            drop(lock);
+            app_disabled_state.push((app_id.to_string(), app.disabled.clone()));
+            let search_provider = AppItemSearchProvider::new(app, launch_service.client(), tx);
             let _ = search_provider_extensions.refresh().in_current_span().await;
 
             providers.push((
@@ -592,9 +618,34 @@ async fn start_dbus_service(log_control: LogControl) -> Result<Service> {
         .await
         .with_context(|| "Failed to connect to session bus")?;
 
+    event!(
+        Level::DEBUG,
+        "Register signal callback when disabled settings change"
+    );
+    settings.connect_changed(None, move |s, k| {
+        let disabled_apps: Vec<String> = s.get(k);
+        event!(
+            Level::INFO,
+            "Disabled settings {} changed to {:?}",
+            k,
+            disabled_apps
+        );
+        app_disabled_state.iter().for_each(|(app_id, disabled)| {
+            let mut lock = disabled.lock();
+            match lock {
+                Ok(ref mut guard) => **guard = disabled_apps.contains(app_id),
+                Err(_) => event!(
+                    Level::WARN,
+                    "Lock for app {} cannot be acquired, disable state remains",
+                    app_id
+                ),
+            }
+        });
+    });
+    // When the 'settings' variable would be dropped, the changed listener would be removed as well
+    forget(settings);
     // Manually tick the connection on the glib mainloop to make all code in zbus run on the mainloop.
     glib::MainContext::ref_thread_default().spawn(tick(connection.clone()));
-
     event!(
         Level::INFO,
         "Acquired name {}, serving search providers",
