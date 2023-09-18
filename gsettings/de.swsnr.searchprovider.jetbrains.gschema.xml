@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE schemalist PUBLIC "" "https://gitlab.gnome.org/GNOME/glib/-/raw/HEAD/gio/gschema.dtd">
+<schemalist>
+    <schema id="de.swsnr.searchprovider.jetbrains" path="/org/gnome/desktop/search-providers/jetbrains/"
+            gettext-domain="">
+        <key name="disabled" type="as">
+            <default>[]</default>
+            <summary>
+                List of JetBrains app ids which should not be considered to search projects for.
+            </summary>
+            <description>
+                Results for IDEs with the associated JetBrains app id will not be displayed when searching.
+            </description>
+        </key>
+    </schema>
+</schemalist>
