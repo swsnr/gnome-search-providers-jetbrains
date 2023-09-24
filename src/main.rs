@@ -127,7 +127,7 @@ Set $RUST_LOG to control the log level",
         )
 }
 
-fn main() {
+fn main() -> Result<()> {
     let matches = app().get_matches();
     if matches.get_flag("providers") {
         let mut labels: Vec<&'static str> = PROVIDERS.iter().map(|p| p.label).collect();
@@ -135,6 +135,7 @@ fn main() {
         for label in labels {
             println!("{label}")
         }
+        Ok(())
     } else {
         let log_control = setup_logging_for_service();
 
@@ -145,23 +146,18 @@ fn main() {
             env!("CARGO_PKG_VERSION")
         );
 
-        match glib::MainContext::ref_thread_default().block_on(start_dbus_service(log_control)) {
-            Ok(service) => {
-                let _ = service.launch_service.start(
-                    service.connection,
-                    SystemdScopeSettings {
-                        prefix: concat!("app-", env!("CARGO_BIN_NAME")).to_string(),
-                        started_by: env!("CARGO_BIN_NAME").to_string(),
-                        documentation: vec![env!("CARGO_PKG_HOMEPAGE").to_string()],
-                    },
-                );
-                create_main_loop(&glib::MainContext::ref_thread_default()).run();
-            }
-            Err(error) => {
-                event!(Level::ERROR, %error, "Failed to start DBus server: {:#}", error);
-                std::process::exit(1);
-            }
-        }
+        let service =
+            glib::MainContext::ref_thread_default().block_on(start_dbus_service(log_control))?;
+        let _ = service.launch_service.start(
+            service.connection,
+            SystemdScopeSettings {
+                prefix: concat!("app-", env!("CARGO_BIN_NAME")).to_string(),
+                started_by: env!("CARGO_BIN_NAME").to_string(),
+                documentation: vec![env!("CARGO_PKG_HOMEPAGE").to_string()],
+            },
+        );
+        create_main_loop(&glib::MainContext::ref_thread_default()).run();
+        Ok(())
     }
 }
 
