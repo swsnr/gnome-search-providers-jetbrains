@@ -6,13 +6,12 @@
 
 //! Jetbrains configuration helpers.
 
+use anyhow::{anyhow, Context, Result};
+use glib::once_cell::sync::OnceCell;
+use regex::Regex;
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
-
-use anyhow::{anyhow, Context, Result};
-use gnome_search_provider_common::glib::once_cell::sync::OnceCell;
-use regex::Regex;
 use tracing::{event, instrument, Level};
 
 /// A path with an associated version.
@@ -123,7 +122,6 @@ impl ConfigLocation<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use gnome_search_provider_common::glib;
     use similar_asserts::assert_eq;
 
     #[test]

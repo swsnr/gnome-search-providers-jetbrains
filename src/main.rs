@@ -5,23 +5,22 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #![deny(warnings, missing_docs, clippy::all)]
-#![forbid(unsafe_code)]
 
 //! Gnome search provider for Jetbrains products
 
 use anyhow::{Context, Result};
 use tracing::{event, Level};
 
-use gnome_search_provider_common::app::*;
-use gnome_search_provider_common::gio;
-use gnome_search_provider_common::gio::glib;
-use gnome_search_provider_common::logging::*;
-
 mod config;
+mod launchservice;
+mod logcontrol;
+mod logging;
 mod providers;
 mod reload;
 mod searchprovider;
+mod systemd;
 
+use crate::launchservice::{App, AppLaunchService, SystemdScopeSettings};
 use providers::*;
 use reload::*;
 use searchprovider::*;
@@ -62,7 +61,7 @@ fn main() -> Result<()> {
         }
         Ok(())
     } else {
-        let log_control = setup_logging_for_service();
+        let log_control = logging::setup_logging_for_service();
 
         event!(
             Level::INFO,

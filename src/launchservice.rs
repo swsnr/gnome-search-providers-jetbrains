@@ -6,20 +6,18 @@
 
 //! A service to launch apps on a given Glib main context.
 
+use crate::systemd::*;
+use gio::prelude::*;
+use glib::VariantDict;
+use glib::{ControlFlow, SourceId};
 use std::convert::TryFrom;
 use std::fmt::{Display, Formatter};
 use std::sync::Arc;
-
-use gio::prelude::*;
-use glib::{ControlFlow, SourceId};
 use tracing::field;
 use tracing::{debug, error, info, span, trace, warn};
 use tracing::{instrument, Level, Span};
 use tracing_futures::Instrument;
 use zbus::zvariant::OwnedObjectPath;
-
-use crate::glib::VariantDict;
-use crate::systemd::*;
 
 /// Settings for systemd scopes created by a search provider for launched apps.
 #[derive(Debug, Clone)]

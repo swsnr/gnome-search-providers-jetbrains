@@ -6,6 +6,8 @@
 
 //! The search provider service for recent projects in Jetbrains products.
 
+use crate::config::ConfigLocation;
+use crate::launchservice::{App, AppId, AppLaunchClient};
 use anyhow::{Context, Result};
 use elementtree::Element;
 use indexmap::IndexMap;
@@ -15,11 +17,6 @@ use std::io::Read;
 use std::path::Path;
 use tracing::{event, instrument, Level};
 use zbus::{dbus_interface, zvariant};
-
-use gnome_search_provider_common::app::{App, AppId, AppLaunchClient};
-use gnome_search_provider_common::glib;
-
-use crate::config::ConfigLocation;
 
 /// Read paths of all recent projects from the given `reader`.
 fn parse_recent_jetbrains_projects<R: Read>(home: &str, reader: R) -> Result<Vec<String>> {
@@ -392,7 +389,6 @@ impl JetbrainsProductSearchProvider {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use gnome_search_provider_common::glib;
     use similar_asserts::assert_eq;
 
     #[test]
