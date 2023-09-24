@@ -38,12 +38,7 @@ impl ReloadAll {
                     );
                 }
                 Ok(search_provider_interface) => {
-                    if let Err(error) = search_provider_interface
-                        .get_mut()
-                        .await
-                        .reload_items()
-                        .await
-                    {
+                    if let Err(error) = search_provider_interface.get_mut().await.reload_items() {
                         is_failed = true;
                         let iface = search_provider_interface.get().await;
                         let app_id = iface.app().id();

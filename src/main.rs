@@ -60,24 +60,12 @@ async fn start_dbus_service(log_control: LogControl) -> Result<Service> {
     for provider in PROVIDERS {
         if let Some(gio_app) = gio::DesktopAppInfo::new(provider.desktop_id) {
             event!(Level::INFO, "Found app {}", provider.desktop_id);
-            let app_id = AppId::from(&gio_app);
-
-            // Move IO to a separate thread pool to avoid blocking the main loop.
-            // We use a shared pool to share two threads among all providers.
-            let io_pool = glib::ThreadPool::shared(Some(2)).with_context(|| {
-                format!(
-                    "Failed to create thread pool to read recent projects for app {}",
-                    &app_id
-                )
-            })?;
-
             let mut search_provider = JetbrainsProductSearchProvider::new(
                 App::from(gio_app),
                 launch_service.client(),
-                io_pool,
                 &provider.config,
             );
-            let _ = search_provider.reload_items().await;
+            let _ = search_provider.reload_items();
 
             providers.push((provider.objpath(), search_provider));
         } else {

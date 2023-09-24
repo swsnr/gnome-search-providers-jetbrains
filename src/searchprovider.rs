@@ -12,7 +12,7 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
-use tracing::{event, instrument, Level, Span};
+use tracing::{event, instrument, Level};
 use zbus::{dbus_interface, zvariant};
 
 use gnome_search_provider_common::app::{App, AppId, AppLaunchClient, AppLaunchItem};
@@ -139,26 +139,11 @@ fn read_recent_items(
     }
 }
 
-async fn get_items(
-    app_id: AppId,
-    config: &'static ConfigLocation<'static>,
-    pool: &glib::ThreadPool,
-) -> Result<IndexMap<String, AppLaunchItem>> {
-    let id_inner = app_id.clone();
-    let span_for_pool = Span::current();
-    event!(Level::DEBUG, %app_id, "Spawning task on thread pool to read recent items");
-    pool.push_future(move || span_for_pool.in_scope(|| read_recent_items(config, &id_inner)))
-        .with_context(|| "Failed to run task on IO thread pool".to_string())?
-        .await
-        .unwrap_or_else(|panic| std::panic::resume_unwind(panic))
-}
-
 #[derive(Debug)]
 pub struct JetbrainsProductSearchProvider {
     app: App,
     items: IndexMap<String, AppLaunchItem>,
     launcher: AppLaunchClient,
-    pool: glib::ThreadPool,
     config: &'static ConfigLocation<'static>,
 }
 
@@ -173,13 +158,11 @@ impl JetbrainsProductSearchProvider {
     pub fn new(
         app: App,
         launcher: AppLaunchClient,
-        pool: glib::ThreadPool,
         config: &'static ConfigLocation<'static>,
     ) -> Self {
         Self {
             app,
             launcher,
-            pool,
             config,
             items: IndexMap::new(),
         }
@@ -191,8 +174,8 @@ impl JetbrainsProductSearchProvider {
     }
 
     /// Reload all recent items provided by this search provider.
-    pub async fn reload_items(&mut self) -> Result<()> {
-        self.items = get_items(self.app.id().clone(), self.config, &self.pool).await?;
+    pub fn reload_items(&mut self) -> Result<()> {
+        self.items = read_recent_items(self.config, self.app.id())?;
         Ok(())
     }
 }
