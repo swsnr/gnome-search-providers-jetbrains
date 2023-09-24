@@ -16,21 +16,20 @@ publish = false
 
 [dependencies]
 anyhow = { version = "1.0.75", default-features = false, features = ["std", "backtrace"] }
-clap = { version = "4.3.20", default-features = false, features = ["std", "cargo", ] }
+clap = { version = "4.4.4", default-features = false, features = ["std", "cargo", ] }
 elementtree = "1.2.3"
 futures-channel = { version = "0.3.28", default-features = false }
-futures-executor = { version = "0.3.28", default-features = false }
+gio = { version = "0.18.2", features = ["v2_60"] }
+glib = { version = "0.18.2", features = ["log"] }
 indexmap = "2.0.0"
-libc = "0.2.147"
-regex = { version = "1.9.3", default-features = false, features = ["std", "perf"] }
+libc = "0.2.148"
+regex = { version = "1.9.5", default-features = false, features = ["std", "perf"] }
 tracing = { version = "0.1.37", default-features = false, features = ["attributes"] }
 tracing-futures = { version = "0.2.5", default-features = false, features = ["std-future"] }
 tracing-journald = "0.3.0"
 tracing-log = { version = "0.1.3", default-features = false, features = ["log-tracer"] }
 tracing-subscriber = { version = "0.3.17", default-features = false, features = ["registry", "parking_lot", "env-filter", ] }
 zbus = { version = "3.14.1", default-features = false, features = ["async-io"] }
-gio = { version = "0.18.1", features = ["v2_60"] }
-glib = { version = "0.18.1", features = ["log"] }
 
 [dev-dependencies]
 similar-asserts = "1.5.0"
