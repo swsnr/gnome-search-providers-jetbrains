@@ -29,7 +29,6 @@ futures-util = { version = "0.3.28", default-features = false }
 futures-channel = { version = "0.3.28", default-features = false }
 gio = { version = "0.18.1", features = ["v2_60"] }
 glib = { version = "0.18.1", features = ["log"] }
-libc = "0.2.147"
 
 [dev-dependencies]
 similar-asserts = "1.5.0"

@@ -16,8 +16,6 @@ use gnome_search_provider_common::app::*;
 use gnome_search_provider_common::gio;
 use gnome_search_provider_common::gio::glib;
 use gnome_search_provider_common::logging::*;
-use gnome_search_provider_common::mainloop::*;
-use gnome_search_provider_common::zbus;
 
 mod config;
 mod providers;
@@ -138,7 +136,27 @@ fn main() -> Result<()> {
                 documentation: vec![env!("CARGO_PKG_HOMEPAGE").to_string()],
             },
         );
-        create_main_loop(&main_context).run();
+        let mainloop = glib::MainLoop::new(Some(&main_context), false);
+
+        // Quit our mainloop on SIGTERM and SIGINT
+        glib::source::unix_signal_add(
+            libc::SIGTERM,
+            glib::clone!(@strong mainloop =>  move || {
+                event!(Level::DEBUG, "Terminated, quitting mainloop");
+                mainloop.quit();
+                glib::ControlFlow::Break
+            }),
+        );
+        glib::source::unix_signal_add(
+            libc::SIGINT,
+            glib::clone!(@strong mainloop =>  move || {
+                event!(Level::DEBUG, "Interrupted, quitting mainloop");
+                mainloop.quit();
+                glib::ControlFlow::Break
+            }),
+        );
+
+        mainloop.run();
         Ok(())
     }
 }

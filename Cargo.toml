@@ -24,6 +24,7 @@ futures-executor = { version = "0.3.28", default-features = false }
 tracing = { version = "0.1.37", default-features = false, features = ["attributes"] }
 tracing-futures = { version = "0.2.5", default-features = false }
 zbus = { version = "3.14.1", default-features = false, features = ["async-io"] }
+libc = "0.2.147"
 
 [dev-dependencies]
 similar-asserts = "1.5.0"
