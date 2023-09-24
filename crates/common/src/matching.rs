@@ -10,9 +10,7 @@ use std::fmt::Debug;
 
 use tracing::trace;
 
-pub use indexmap::IndexMap;
-
-/// Match against a list of terms and return a score.
+// Match against a list of terms and return a score.
 pub trait ScoreMatchable {
     /// Match self against `terms` and return a score about how "well" self matches `terms`.
     ///

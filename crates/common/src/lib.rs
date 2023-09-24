@@ -12,7 +12,6 @@ mod logcontrol;
 
 pub mod app;
 pub mod logging;
-pub mod matching;
 
 mod systemd;
 

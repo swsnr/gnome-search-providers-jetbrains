@@ -12,19 +12,17 @@ publish.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-regex = { version = "1.9.3", default-features = false, features = ["std", "perf"] }
-elementtree = "1.2.3"
 anyhow = { version = "1.0.75", default-features = false, features = ["std", "backtrace"] }
-clap = { version = "4.3.20", default-features = false, features = [
-    "std",
-    "cargo",
-] }
-gnome-search-provider-common = { path = "./crates/common" }
+clap = { version = "4.3.20", default-features = false, features = ["std", "cargo", ] }
+elementtree = "1.2.3"
 futures-executor = { version = "0.3.28", default-features = false }
+gnome-search-provider-common = { path = "./crates/common" }
+indexmap = "2.0.0"
+libc = "0.2.147"
+regex = { version = "1.9.3", default-features = false, features = ["std", "perf"] }
 tracing = { version = "0.1.37", default-features = false, features = ["attributes"] }
 tracing-futures = { version = "0.2.5", default-features = false }
 zbus = { version = "3.14.1", default-features = false, features = ["async-io"] }
-libc = "0.2.147"
 
 [dev-dependencies]
 similar-asserts = "1.5.0"

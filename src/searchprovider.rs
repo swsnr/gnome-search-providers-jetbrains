@@ -8,6 +8,7 @@
 
 use anyhow::{Context, Result};
 use elementtree::Element;
+use indexmap::IndexMap;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Read;
@@ -15,9 +16,8 @@ use std::path::Path;
 use tracing::{event, instrument, Level};
 use zbus::{dbus_interface, zvariant};
 
-use gnome_search_provider_common::app::{App, AppId, AppLaunchClient, AppLaunchItem};
+use gnome_search_provider_common::app::{App, AppId, AppLaunchClient};
 use gnome_search_provider_common::glib;
-use gnome_search_provider_common::matching::{find_matching_items, IndexMap};
 
 use crate::config::ConfigLocation;
 
@@ -92,11 +92,29 @@ fn get_project_name<P: AsRef<Path>>(path: P) -> Option<String> {
     }
 }
 
+/// A recent project from a Jetbrains IDE.
+///
+/// Note that rider calls these solutions per dotnet lingo.
+#[derive(Debug, PartialEq, Eq)]
+pub struct JetbrainsRecentProject {
+    /// The human readable project name.
+    ///
+    /// This is the name explicitly assigned by the user (if they did rename the project) or the
+    /// last component of the project directory.
+    name: String,
+
+    /// The project directory.
+    ///
+    /// We deliberately use String here instead of `PathBuf`, since we never really operate on this
+    /// as a path, but a `PathBuf` would loose us easy access to the string API for matching.
+    directory: String,
+}
+
 #[instrument(fields(app_id = %app_id))]
 fn read_recent_items(
     config: &ConfigLocation<'_>,
     app_id: &AppId,
-) -> Result<IndexMap<String, AppLaunchItem>> {
+) -> Result<IndexMap<String, JetbrainsRecentProject>> {
     event!(Level::INFO, %app_id, "Reading recents projects of {}", app_id);
     match config
         .find_latest_recent_projects_file(&glib::user_config_dir())
@@ -120,9 +138,9 @@ fn read_recent_items(
                     let id = format!("jetbrains-recent-project-{app_id}-{path}");
                     items.insert(
                         id,
-                        AppLaunchItem {
+                        JetbrainsRecentProject {
                             name,
-                            uri: path.to_string(),
+                            directory: path.to_string(),
                         },
                     );
                 } else {
@@ -142,7 +160,7 @@ fn read_recent_items(
 #[derive(Debug)]
 pub struct JetbrainsProductSearchProvider {
     app: App,
-    items: IndexMap<String, AppLaunchItem>,
+    items: IndexMap<String, JetbrainsRecentProject>,
     launcher: AppLaunchClient,
     config: &'static ConfigLocation<'static>,
 }
@@ -180,6 +198,33 @@ impl JetbrainsProductSearchProvider {
     }
 }
 
+/// Calculate how well `item` matches all of the given `terms`.
+///
+/// If all terms match the name of the `item`, the item receives a base score of 10.
+/// If all terms match the directory of the `item`, the items gets scored for each term according to
+/// how far right the term appears in the directory, under the assumption that the right most part
+/// of a directory path is the most specific.
+///
+/// All matches are done on the lowercase text, i.e. case insensitve.
+fn item_score(item: &JetbrainsRecentProject, terms: &[&str]) -> f64 {
+    let name = item.name.to_lowercase();
+    let directory = item.directory.to_lowercase();
+    terms
+        .iter()
+        .try_fold(0.0, |score, term| {
+            directory
+                .rfind(&term.to_lowercase())
+                // We add 1 to avoid returning zero if the term matches right at the beginning.
+                .map(|index| score + ((index + 1) as f64 / item.directory.len() as f64))
+        })
+        .unwrap_or(0.0)
+        + if terms.iter().all(|term| name.contains(&term.to_lowercase())) {
+            10.0
+        } else {
+            0.0
+        }
+}
+
 /// The DBus interface of the search provider.
 ///
 /// See <https://developer.gnome.org/SearchProvider/> for information.
@@ -191,12 +236,22 @@ impl JetbrainsProductSearchProvider {
     /// and should return an array of result IDs. gnome-shell will call GetResultMetas for (some) of these result
     /// IDs to get details about the result that can be be displayed in the result list.
     #[instrument(skip(self), fields(app_id = %self.app.id()))]
-    fn get_initial_result_set(&self, terms: Vec<&str>) -> Vec<String> {
+    fn get_initial_result_set(&self, terms: Vec<&str>) -> Vec<&str> {
         event!(Level::DEBUG, "Searching for {:?}", terms);
-        let ids = find_matching_items(self.items.iter(), terms.as_slice())
-            .into_iter()
-            .map(String::to_owned)
-            .collect();
+        let mut scored_ids = self
+            .items
+            .iter()
+            .filter_map(|(id, item)| {
+                let score = item_score(item, &terms);
+                if 0.0 < score {
+                    Some((id.as_ref(), score))
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
+        scored_ids.sort_by_key(|(_, score)| -((score * 1000.0) as i64));
+        let ids = scored_ids.into_iter().map(|(id, _)| id).collect();
         event!(Level::DEBUG, "Found ids {:?}", ids);
         ids
     }
@@ -207,24 +262,18 @@ impl JetbrainsProductSearchProvider {
     /// It gets the previous search results and the current search terms as arguments, and should return an array of result IDs,
     /// just like GetInitialResultSet.
     #[instrument(skip(self), fields(app_id = %self.app.id()))]
-    fn get_subsearch_result_set(
-        &self,
-        previous_results: Vec<&str>,
-        terms: Vec<&str>,
-    ) -> Vec<String> {
+    fn get_subsearch_result_set(&self, previous_results: Vec<&str>, terms: Vec<&str>) -> Vec<&str> {
         event!(
             Level::DEBUG,
             "Searching for {:?} in {:?}",
             terms,
             previous_results
         );
-        let candidates = previous_results
-            .iter()
-            .filter_map(|&id| self.items.get(id).map(|p| (id, p)));
-
-        let ids = find_matching_items(candidates, terms.as_slice())
+        // For simplicity just run the overall search again, and filter out everything not already matched.
+        let ids = self
+            .get_initial_result_set(terms)
             .into_iter()
-            .map(|s| s.to_owned())
+            .filter(|id| previous_results.contains(id))
             .collect();
         event!(Level::DEBUG, "Found ids {:?}", ids);
         ids
@@ -259,7 +308,7 @@ impl JetbrainsProductSearchProvider {
                 meta.insert("name".to_string(), item.name.clone().into());
                 event!(Level::DEBUG, %item_id, "Using icon {}", self.app.icon());
                 meta.insert("gicon".to_string(), self.app.icon().to_string().into());
-                meta.insert("description".to_string(), item.uri.clone().into());
+                meta.insert("description".to_string(), item.directory.clone().into());
                 metas.push(meta);
             }
         }
@@ -291,7 +340,7 @@ impl JetbrainsProductSearchProvider {
         if let Some(item) = self.items.get(item_id) {
             event!(Level::INFO, item_id, "Launching recent item {:?}", item);
             self.launcher
-                .launch_uri(self.app.id().clone(), item.uri.clone())
+                .launch_uri(self.app.id().clone(), item.directory.clone())
                 .await
                 .map_err(|error| {
                     event!(
@@ -299,13 +348,13 @@ impl JetbrainsProductSearchProvider {
                         %error,
                         "Failed to launch app {} for {:?}: {:#}",
                         self.app.id(),
-                        item.uri,
+                        item.directory,
                         error
                     );
                     zbus::fdo::Error::Failed(format!(
                         "Failed to launch app {} for {}: {}",
                         self.app.id(),
-                        item.uri,
+                        item.directory,
                         error
                     ))
                 })
