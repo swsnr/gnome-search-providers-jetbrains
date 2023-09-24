@@ -55,38 +55,27 @@ struct Service {
 /// handle incoming messages.
 async fn start_dbus_service(log_control: LogControl) -> Result<Service> {
     let launch_service = AppLaunchService::new();
-
-    let mut providers = Vec::with_capacity(PROVIDERS.len());
-    for provider in PROVIDERS {
-        if let Some(gio_app) = gio::DesktopAppInfo::new(provider.desktop_id) {
-            event!(Level::INFO, "Found app {}", provider.desktop_id);
-            let mut search_provider = JetbrainsProductSearchProvider::new(
-                App::from(gio_app),
-                launch_service.client(),
-                &provider.config,
-            );
-            let _ = search_provider.reload_items();
-
-            providers.push((provider.objpath(), search_provider));
-        } else {
-            event!(
-                Level::DEBUG,
-                desktop_id = provider.desktop_id,
-                "Skipping provider, app not found"
-            );
-        }
-    }
-
     event!(
         Level::DEBUG,
-        "Connecting to session bus, registering interfaces for {} providers, and acquiring {}",
-        providers.len(),
+        "Connecting to session bus, registering interfaces for search providers, and acquiring {}",
         BUSNAME
     );
     // We disable the internal executor because we'd like to run the connection
     // exclusively on the glib mainloop, and thus tick it manually (see below).
-    let connection = providers
-        .into_iter()
+    let connection = PROVIDERS
+        .iter()
+        .filter_map(|provider| {
+            gio::DesktopAppInfo::new(provider.desktop_id).map(|gio_app| {
+                event!(Level::INFO, "Found app {}", provider.desktop_id);
+                let mut search_provider = JetbrainsProductSearchProvider::new(
+                    App::from(gio_app),
+                    launch_service.client(),
+                    &provider.config,
+                );
+                let _ = search_provider.reload_items();
+                (provider.objpath(), search_provider)
+            })
+        })
         .try_fold(
             zbus::ConnectionBuilder::session()?.internal_executor(false),
             |builder, (path, provider)| {
