@@ -37,79 +37,6 @@ async fn tick(connection: zbus::Connection) {
     }
 }
 
-/// The running service.
-#[derive(Debug)]
-struct Service {
-    /// The launch service used to launch applications.
-    launch_service: AppLaunchService,
-    /// The DBus connection of this service.
-    connection: zbus::Connection,
-}
-
-/// Starts the DBUS service.
-///
-/// Connect to the session bus and register a new DBus object for every provider
-/// whose underlying app is installed.
-///
-/// Then register the connection on the Glib main loop and install a callback to
-/// handle incoming messages.
-async fn start_dbus_service(log_control: LogControl) -> Result<Service> {
-    let launch_service = AppLaunchService::new();
-    event!(
-        Level::DEBUG,
-        "Connecting to session bus, registering interfaces for search providers, and acquiring {}",
-        BUSNAME
-    );
-    // We disable the internal executor because we'd like to run the connection
-    // exclusively on the glib mainloop, and thus tick it manually (see below).
-    let connection = PROVIDERS
-        .iter()
-        .filter_map(|provider| {
-            gio::DesktopAppInfo::new(provider.desktop_id).map(|gio_app| {
-                event!(Level::INFO, "Found app {}", provider.desktop_id);
-                let mut search_provider = JetbrainsProductSearchProvider::new(
-                    App::from(gio_app),
-                    launch_service.client(),
-                    &provider.config,
-                );
-                let _ = search_provider.reload_items();
-                (provider.objpath(), search_provider)
-            })
-        })
-        .try_fold(
-            zbus::ConnectionBuilder::session()?.internal_executor(false),
-            |builder, (path, provider)| {
-                event!(
-                    Level::DEBUG,
-                    app_id = %provider.app().id(),
-                    "Serving search provider for {} at {}",
-                    provider.app().id(),
-                    &path
-                );
-                builder.serve_at(path, provider)
-            },
-        )?
-        .serve_at("/", ReloadAll)?
-        .serve_at("/org/freedesktop/LogControl1", log_control)?
-        .name(BUSNAME)?
-        .build()
-        .await
-        .with_context(|| "Failed to connect to session bus")?;
-
-    // Manually tick the connection on the glib mainloop to make all code in zbus run on the mainloop.
-    glib::MainContext::ref_thread_default().spawn(tick(connection.clone()));
-
-    event!(
-        Level::INFO,
-        "Acquired name {}, serving search providers",
-        BUSNAME
-    );
-    Ok(Service {
-        launch_service,
-        connection,
-    })
-}
-
 fn app() -> clap::Command {
     use clap::*;
     command!()
@@ -146,17 +73,72 @@ fn main() -> Result<()> {
             env!("CARGO_PKG_VERSION")
         );
 
-        let service =
-            glib::MainContext::ref_thread_default().block_on(start_dbus_service(log_control))?;
-        let _ = service.launch_service.start(
-            service.connection,
+        let launch_service = AppLaunchService::new();
+        event!(
+            Level::DEBUG,
+            "Connecting to session bus, registering interfaces for search providers, and acquiring {}",
+            BUSNAME
+        );
+
+        let main_context = glib::MainContext::ref_thread_default();
+
+        // Connect to DBus and register all our objects for search providers.
+        let connection = main_context.block_on(async {
+            PROVIDERS
+                .iter()
+                .filter_map(|provider| {
+                    gio::DesktopAppInfo::new(provider.desktop_id).map(|gio_app| {
+                        event!(Level::INFO, "Found app {}", provider.desktop_id);
+                        let mut search_provider = JetbrainsProductSearchProvider::new(
+                            App::from(gio_app),
+                            launch_service.client(),
+                            &provider.config,
+                        );
+                        let _ = search_provider.reload_items();
+                        (provider.objpath(), search_provider)
+                    })
+                })
+                .try_fold(
+                    // We disable the internal executor because we'd like to run the connection
+                    // exclusively on the glib mainloop, and thus tick it manually (see below).
+                    zbus::ConnectionBuilder::session()?.internal_executor(false),
+                    |builder, (path, provider)| {
+                        event!(
+                            Level::DEBUG,
+                            app_id = %provider.app().id(),
+                            "Serving search provider for {} at {}",
+                            provider.app().id(),
+                            &path
+                        );
+                        builder.serve_at(path, provider)
+                    },
+                )?
+                .serve_at("/", ReloadAll)?
+                .serve_at("/org/freedesktop/LogControl1", log_control)?
+                .name(BUSNAME)?
+                .build()
+                .await
+                .with_context(|| "Failed to connect to session bus")
+        })?;
+
+        // Manually tick the connection on the glib mainloop to make all code in zbus run on the mainloop.
+        main_context.spawn(tick(connection.clone()));
+
+        event!(
+            Level::INFO,
+            "Acquired name {}, serving search providers",
+            BUSNAME
+        );
+
+        let _ = launch_service.start(
+            connection,
             SystemdScopeSettings {
                 prefix: concat!("app-", env!("CARGO_BIN_NAME")).to_string(),
                 started_by: env!("CARGO_BIN_NAME").to_string(),
                 documentation: vec![env!("CARGO_PKG_HOMEPAGE").to_string()],
             },
         );
-        create_main_loop(&glib::MainContext::ref_thread_default()).run();
+        create_main_loop(&main_context).run();
         Ok(())
     }
 }
