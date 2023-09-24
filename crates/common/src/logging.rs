@@ -55,7 +55,7 @@ type TargetLayer<S> = Layered<StdoutLayer<S>, JournalLayer, S>;
 type FilterSubscriber = Layered<Option<EnvFilter>, Registry>;
 type LevelSubscriber = Layered<Layer<LevelFilter, FilterSubscriber>, FilterSubscriber>;
 
-/// Create a new target lavel for the given `target`.
+/// Create a new target level for the given `target`.
 ///
 /// If `target` is `Null` enable no inner layer at all; otherwise enable the journal or
 /// stdout inner layers depending on whether `target` is `Journal` or `Console` respectively.
