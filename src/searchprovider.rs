@@ -191,14 +191,14 @@ impl JetbrainsProductSearchProvider {
     /// and should return an array of result IDs. gnome-shell will call GetResultMetas for (some) of these result
     /// IDs to get details about the result that can be be displayed in the result list.
     #[instrument(skip(self), fields(app_id = %self.app.id()))]
-    fn get_initial_result_set(&self, terms: Vec<&str>) -> zbus::fdo::Result<Vec<String>> {
+    fn get_initial_result_set(&self, terms: Vec<&str>) -> Vec<String> {
         event!(Level::DEBUG, "Searching for {:?}", terms);
         let ids = find_matching_items(self.items.iter(), terms.as_slice())
             .into_iter()
             .map(String::to_owned)
             .collect();
         event!(Level::DEBUG, "Found ids {:?}", ids);
-        Ok(ids)
+        ids
     }
 
     /// Refine an ongoing search.
@@ -211,7 +211,7 @@ impl JetbrainsProductSearchProvider {
         &self,
         previous_results: Vec<&str>,
         terms: Vec<&str>,
-    ) -> zbus::fdo::Result<Vec<String>> {
+    ) -> Vec<String> {
         event!(
             Level::DEBUG,
             "Searching for {:?} in {:?}",
@@ -227,7 +227,7 @@ impl JetbrainsProductSearchProvider {
             .map(|s| s.to_owned())
             .collect();
         event!(Level::DEBUG, "Found ids {:?}", ids);
-        Ok(ids)
+        ids
     }
 
     /// Get metadata for results.
