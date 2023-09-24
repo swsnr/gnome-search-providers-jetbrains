@@ -697,6 +697,7 @@ dependencies = [
  "similar-asserts",
  "tracing",
  "tracing-futures",
+ "zbus",
 ]
 
 [[package]]

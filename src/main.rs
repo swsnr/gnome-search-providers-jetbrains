@@ -11,22 +11,21 @@
 
 use anyhow::{Context, Result};
 use tracing::{event, Level};
-use tracing_futures::Instrument;
 
 use gnome_search_provider_common::app::*;
-use gnome_search_provider_common::futures_channel::mpsc;
 use gnome_search_provider_common::gio;
 use gnome_search_provider_common::gio::glib;
 use gnome_search_provider_common::logging::*;
 use gnome_search_provider_common::mainloop::*;
-use gnome_search_provider_common::serviceinterface::ServiceInterface;
 use gnome_search_provider_common::zbus;
 
 mod config;
 mod providers;
+mod reload;
 mod searchprovider;
 
 use providers::*;
+use reload::*;
 use searchprovider::*;
 
 /// The name to request on the bus.
@@ -58,16 +57,11 @@ async fn start_dbus_service(log_control: LogControl) -> Result<Service> {
     let launch_service = AppLaunchService::new();
 
     let mut providers = Vec::with_capacity(PROVIDERS.len());
-    let mut search_services = Vec::with_capacity(PROVIDERS.len());
     for provider in PROVIDERS {
         if let Some(gio_app) = gio::DesktopAppInfo::new(provider.desktop_id) {
             event!(Level::INFO, "Found app {}", provider.desktop_id);
             let app_id = AppId::from(&gio_app);
 
-            let (tx, rx) = mpsc::channel(8);
-            search_services.push((app_id.clone(), tx.clone()));
-
-            event!(Level::DEBUG, %app_id, "Starting search service for {}", &app_id);
             // Move IO to a separate thread pool to avoid blocking the main loop.
             // We use a shared pool to share two threads among all providers.
             let io_pool = glib::ThreadPool::shared(Some(2)).with_context(|| {
@@ -76,25 +70,16 @@ async fn start_dbus_service(log_control: LogControl) -> Result<Service> {
                     &app_id
                 )
             })?;
-            glib::MainContext::ref_thread_default().spawn(serve_search_provider(
-                app_id.clone(),
-                &provider.config,
+
+            let mut search_provider = JetbrainsProductSearchProvider::new(
+                App::from(gio_app),
+                launch_service.client(),
                 io_pool,
-                rx,
-            ));
+                &provider.config,
+            );
+            let _ = search_provider.reload_items().await;
 
-            let mut search_provider_extensions =
-                SearchProviderExtensions::new((&gio_app).into(), tx.clone());
-            let search_provider =
-                AppItemSearchProvider::new(gio_app.into(), launch_service.client(), tx);
-
-            let _ = search_provider_extensions.refresh().in_current_span().await;
-
-            providers.push((
-                provider.objpath(),
-                search_provider,
-                search_provider_extensions,
-            ));
+            providers.push((provider.objpath(), search_provider));
         } else {
             event!(
                 Level::DEBUG,
@@ -110,14 +95,13 @@ async fn start_dbus_service(log_control: LogControl) -> Result<Service> {
         providers.len(),
         BUSNAME
     );
-    let service_interface = ServiceInterface::new(search_services);
     // We disable the internal executor because we'd like to run the connection
     // exclusively on the glib mainloop, and thus tick it manually (see below).
     let connection = providers
         .into_iter()
         .try_fold(
             zbus::ConnectionBuilder::session()?.internal_executor(false),
-            |builder, (path, provider, extensions)| {
+            |builder, (path, provider)| {
                 event!(
                     Level::DEBUG,
                     app_id = %provider.app().id(),
@@ -125,12 +109,10 @@ async fn start_dbus_service(log_control: LogControl) -> Result<Service> {
                     provider.app().id(),
                     &path
                 );
-                builder
-                    .serve_at(path.clone(), provider)?
-                    .serve_at(path, extensions)
+                builder.serve_at(path, provider)
             },
         )?
-        .serve_at("/", service_interface)?
+        .serve_at("/", ReloadAll)?
         .serve_at("/org/freedesktop/LogControl1", log_control)?
         .name(BUSNAME)?
         .build()

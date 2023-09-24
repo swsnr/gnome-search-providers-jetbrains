@@ -14,7 +14,6 @@ pub mod app;
 pub mod logging;
 pub mod mainloop;
 pub mod matching;
-pub mod serviceinterface;
 
 mod systemd;
 

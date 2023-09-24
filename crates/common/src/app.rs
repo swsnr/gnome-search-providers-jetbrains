@@ -8,11 +8,9 @@
 
 mod item;
 mod launchservice;
-mod searchprovider;
 
 pub use item::AppLaunchItem;
 pub use launchservice::{App, AppId, AppLaunchClient, AppLaunchService, SystemdScopeSettings};
-pub use searchprovider::{AppItemSearchProvider, AppItemSearchRequest, SearchProviderExtensions};
 
 #[cfg(test)]
 mod tests {

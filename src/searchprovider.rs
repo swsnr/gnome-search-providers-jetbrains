@@ -8,18 +8,16 @@
 
 use anyhow::{Context, Result};
 use elementtree::Element;
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
-use std::sync::Arc;
 use tracing::{event, instrument, Level, Span};
-use tracing_futures::Instrument;
+use zbus::{dbus_interface, zvariant};
 
-use gnome_search_provider_common::app::{AppId, AppItemSearchRequest, AppLaunchItem};
-use gnome_search_provider_common::futures_channel::mpsc;
-use gnome_search_provider_common::futures_util::StreamExt;
+use gnome_search_provider_common::app::{App, AppId, AppLaunchClient, AppLaunchItem};
 use gnome_search_provider_common::glib;
-use gnome_search_provider_common::matching::IndexMap;
+use gnome_search_provider_common::matching::{find_matching_items, IndexMap};
 
 use crate::config::ConfigLocation;
 
@@ -155,75 +153,207 @@ async fn get_items(
         .unwrap_or_else(|panic| std::panic::resume_unwind(panic))
 }
 
-/// Handle a single search provider request.
-///
-/// Handle `request` and return the new list of app items, if any.
-#[instrument(skip(pool, items), fields(app_id=%app_id, request=%request.name()))]
-async fn handle_search_provider_request(
-    app_id: AppId,
+#[derive(Debug)]
+pub struct JetbrainsProductSearchProvider {
+    app: App,
+    items: IndexMap<String, AppLaunchItem>,
+    launcher: AppLaunchClient,
+    pool: glib::ThreadPool,
     config: &'static ConfigLocation<'static>,
-    pool: &glib::ThreadPool,
-    items: Option<Arc<IndexMap<String, AppLaunchItem>>>,
-    request: AppItemSearchRequest,
-) -> Option<Arc<IndexMap<String, AppLaunchItem>>> {
-    match request {
-        AppItemSearchRequest::RefreshItems(span) => {
-            span.in_scope(|| {
-                event!(Level::DEBUG, %app_id, "Updating items");
-            });
-            let result = get_items(app_id.clone(), config, pool)
-                .instrument(span.clone())
-                .await;
-            match result {
-                Ok(items) => Some(Arc::new(items)),
-                Err(error) => span.in_scope(|| {
-                    event!(Level::ERROR, %app_id, %error, "Failed to get recent items: {:#}", error);
-                    None
-                })
-            }
+}
+
+impl JetbrainsProductSearchProvider {
+    /// Create a new search provider for a jetbrains product.
+    ///
+    /// `app` describes the underlying app to launch items with, and `launcher` providers a service
+    /// to launch apps from the Glib main loop.  `config` describes where this Jetbrains product has
+    /// its configuration.
+    ///
+    /// `pool` is a thread pool to run IO on.
+    pub fn new(
+        app: App,
+        launcher: AppLaunchClient,
+        pool: glib::ThreadPool,
+        config: &'static ConfigLocation<'static>,
+    ) -> Self {
+        Self {
+            app,
+            launcher,
+            pool,
+            config,
+            items: IndexMap::new(),
         }
-        AppItemSearchRequest::GetItems(span, respond_to) => {
-            let result = match &items {
-                None => respond_to.send(Arc::new(IndexMap::new())),
-                Some(items) => respond_to.send(items.clone()),
-            };
-            if result.is_err() {
-                span.in_scope(|| {
-                    event!(Level::ERROR, %app_id, "Cannot answer GetItems request, remote side closed prematurely");
-                })
-            }
-            items
-        }
+    }
+
+    /// Get the underyling app for this Jetbrains product.
+    pub fn app(&self) -> &App {
+        &self.app
+    }
+
+    /// Reload all recent items provided by this search provider.
+    pub async fn reload_items(&mut self) -> Result<()> {
+        self.items = get_items(self.app.id().clone(), self.config, &self.pool).await?;
+        Ok(())
     }
 }
 
-/// Serve search provider requests.
+/// The DBus interface of the search provider.
 ///
-/// Loop over requests received from `rx`, and provide the search provider with appropriate
-/// responses.
-///
-/// `pool` is used to spawn blocking IO.
-pub async fn serve_search_provider(
-    app_id: AppId,
-    config: &'static ConfigLocation<'static>,
-    pool: glib::ThreadPool,
-    mut rx: mpsc::Receiver<AppItemSearchRequest>,
-) {
-    let mut items = None;
-    loop {
-        match rx.next().await {
-            None => {
-                event!(Level::DEBUG, %app_id, "No more requests from search provider, stopping");
-                break;
-            }
-            Some(request) => {
-                let span = request.span().clone();
-                items =
-                    handle_search_provider_request(app_id.clone(), config, &pool, items, request)
-                        .instrument(span)
-                        .await;
+/// See <https://developer.gnome.org/SearchProvider/> for information.
+#[dbus_interface(name = "org.gnome.Shell.SearchProvider2")]
+impl JetbrainsProductSearchProvider {
+    /// Starts a search.
+    ///
+    /// This function is called when a new search is started. It gets an array of search terms as arguments,
+    /// and should return an array of result IDs. gnome-shell will call GetResultMetas for (some) of these result
+    /// IDs to get details about the result that can be be displayed in the result list.
+    #[instrument(skip(self), fields(app_id = %self.app.id()))]
+    fn get_initial_result_set(&self, terms: Vec<&str>) -> zbus::fdo::Result<Vec<String>> {
+        event!(Level::DEBUG, "Searching for {:?}", terms);
+        let ids = find_matching_items(self.items.iter(), terms.as_slice())
+            .into_iter()
+            .map(String::to_owned)
+            .collect();
+        event!(Level::DEBUG, "Found ids {:?}", ids);
+        Ok(ids)
+    }
+
+    /// Refine an ongoing search.
+    ///
+    /// This function is called to refine the initial search results when the user types more characters in the search entry.
+    /// It gets the previous search results and the current search terms as arguments, and should return an array of result IDs,
+    /// just like GetInitialResultSet.
+    #[instrument(skip(self), fields(app_id = %self.app.id()))]
+    fn get_subsearch_result_set(
+        &self,
+        previous_results: Vec<&str>,
+        terms: Vec<&str>,
+    ) -> zbus::fdo::Result<Vec<String>> {
+        event!(
+            Level::DEBUG,
+            "Searching for {:?} in {:?}",
+            terms,
+            previous_results
+        );
+        let candidates = previous_results
+            .iter()
+            .filter_map(|&id| self.items.get(id).map(|p| (id, p)));
+
+        let ids = find_matching_items(candidates, terms.as_slice())
+            .into_iter()
+            .map(|s| s.to_owned())
+            .collect();
+        event!(Level::DEBUG, "Found ids {:?}", ids);
+        Ok(ids)
+    }
+
+    /// Get metadata for results.
+    ///
+    /// This function is called to obtain detailed information for results.
+    /// It gets an array of result IDs as arguments, and should return a matching array of dictionaries
+    /// (ie one a{sv} for each passed-in result ID).
+    ///
+    /// The following pieces of information should be provided for each result:
+    //
+    //  - "id": the result ID
+    //  - "name": the display name for the result
+    //  - "icon": a serialized GIcon (see g_icon_serialize()), or alternatively,
+    //  - "gicon": a textual representation of a GIcon (see g_icon_to_string()), or alternatively,
+    //  - "icon-data": a tuple of type (iiibiiay) describing a pixbuf with width, height, rowstride, has-alpha, bits-per-sample, and image data
+    //  - "description": an optional short description (1-2 lines)
+    #[instrument(skip(self), fields(app_id = %self.app.id()))]
+    fn get_result_metas(
+        &self,
+        results: Vec<String>,
+    ) -> zbus::fdo::Result<Vec<HashMap<String, zvariant::Value<'_>>>> {
+        event!(Level::DEBUG, "Getting meta info for {:?}", results);
+        let mut metas = Vec::with_capacity(results.len());
+        for item_id in results {
+            if let Some(item) = self.items.get(&item_id) {
+                event!(Level::DEBUG, %item_id, "Compiling meta info for {}", item_id);
+                let mut meta: HashMap<String, zvariant::Value> = HashMap::new();
+                meta.insert("id".to_string(), item_id.clone().into());
+                meta.insert("name".to_string(), item.name.clone().into());
+                event!(Level::DEBUG, %item_id, "Using icon {}", self.app.icon());
+                meta.insert("gicon".to_string(), self.app.icon().to_string().into());
+                meta.insert("description".to_string(), item.uri.clone().into());
+                metas.push(meta);
             }
         }
+        event!(Level::DEBUG, "Return meta info {:?}", &metas);
+        Ok(metas)
+    }
+
+    /// Activate an individual result.
+    ///
+    /// This function is called when the user clicks on an individual result to open it in the application.
+    /// The arguments are the result ID, the current search terms and a timestamp.
+    ///
+    /// Launches the underlying app with the path to the selected item.
+    #[instrument(skip(self), fields(app_id = %self.app.id()))]
+    async fn activate_result(
+        &mut self,
+        item_id: &str,
+        terms: Vec<&str>,
+        timestamp: u32,
+    ) -> zbus::fdo::Result<()> {
+        event!(
+            Level::DEBUG,
+            item_id,
+            "Activating result {} for {:?} at {}",
+            item_id,
+            terms,
+            timestamp
+        );
+        if let Some(item) = self.items.get(item_id) {
+            event!(Level::INFO, item_id, "Launching recent item {:?}", item);
+            self.launcher
+                .launch_uri(self.app.id().clone(), item.uri.clone())
+                .await
+                .map_err(|error| {
+                    event!(
+                        Level::ERROR,
+                        %error,
+                        "Failed to launch app {} for {:?}: {:#}",
+                        self.app.id(),
+                        item.uri,
+                        error
+                    );
+                    zbus::fdo::Error::Failed(format!(
+                        "Failed to launch app {} for {}: {}",
+                        self.app.id(),
+                        item.uri,
+                        error
+                    ))
+                })
+        } else {
+            event!(Level::ERROR, item_id, "Item not found");
+            Err(zbus::fdo::Error::Failed(format!(
+                "Result {item_id} not found"
+            )))
+        }
+    }
+
+    /// Launch a search within the App.
+    ///
+    /// This function is called when the user clicks on the provider icon to display more search results in the application.
+    /// The arguments are the current search terms and a timestamp.
+    ///
+    /// Currently it simply launches the app without any arguments.
+    #[instrument(skip(self), fields(app_id = %self.app.id()))]
+    async fn launch_search(&self, _terms: Vec<String>, _timestamp: u32) -> zbus::fdo::Result<()> {
+        event!(Level::DEBUG, "Launching app directly");
+        self.launcher
+            .launch_app(self.app.id().clone())
+            .await
+            .map_err(|error| {
+                event!(Level::ERROR, %error, "Failed to launch app {}: {:#}", self.app.id(), error);
+                zbus::fdo::Error::Failed(format!(
+                    "Failed to launch app {}: {}",
+                    self.app.id(),
+                    error
+                ))
+            })
     }
 }
 

@@ -5,4 +5,4 @@ Description=Jetbrains projects search provider for Gnome shell
 Type=dbus
 BusName=de.swsnr.searchprovider.Jetbrains
 ExecStart=gnome-search-providers-jetbrains
-ExecReload=busctl --user call de.swsnr.searchprovider.Jetbrains / de.swsnr.searchprovider.SearchProviders RefreshAll
+ExecReload=busctl --user call de.swsnr.searchprovider.Jetbrains / de.swsnr.searchprovider.ReloadAll ReloadAll
