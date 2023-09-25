@@ -6,6 +6,8 @@ and this project doesn't really care for versioning.
 
 ## [Unreleased]
 
+## [1.15.0] – 2023-09-25
+
 ### Changed
 - Refactored internals a lot to simplify code.
 
@@ -245,7 +247,8 @@ and this project doesn't really care for versioning.
 
 Initial prototype in Python, with support for Toolbox IDEA CE and WebStorm.
 
-[Unreleased]: https://github.com/swsnr/gnome-search-providers-jetbrains/compare/v1.14.0...HEAD
+[Unreleased]: https://github.com/swsnr/gnome-search-providers-jetbrains/compare/v1.15.0...HEAD
+[1.15.0]: https://github.com/swsnr/gnome-search-providers-jetbrains/compare/v1.14.0...v1.15.0
 [1.14.0]: https://github.com/swsnr/gnome-search-providers-jetbrains/compare/v1.13.0...v1.14.0
 [1.13.0]: https://github.com/swsnr/gnome-search-providers-jetbrains/compare/v1.12.6...v1.13.0
 [1.12.6]: https://github.com/swsnr/gnome-search-providers-jetbrains/compare/v1.12.5...v1.12.6
