@@ -6,6 +6,9 @@ and this project doesn't really care for versioning.
 
 ## [Unreleased]
 
+### Fixed
+- Correctly read project names.
+
 ## [1.14.0] – 2023-09-14
 
 ### Added
