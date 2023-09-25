@@ -57,7 +57,11 @@ fn parse_recent_jetbrains_projects<R: Read>(home: &str, reader: R) -> Result<Vec
 /// Look for a `name` file in the `.idea` sub-directory and return the contents of this file.
 fn read_name_from_file<P: AsRef<Path>>(path: P) -> Result<String> {
     let name_file = path.as_ref().join(".idea").join(".name");
-    event!(Level::TRACE, "Trying to read name from {}", name_file.display());
+    event!(
+        Level::TRACE,
+        "Trying to read name from {}",
+        name_file.display()
+    );
     let contents = std::fs::read_to_string(&name_file)
         .with_context(|| format!("Failed to read project name from {}", name_file.display()))?;
     Ok(contents.trim().to_string())
