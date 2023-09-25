@@ -113,10 +113,8 @@ fn main() -> Result<()> {
             BUSNAME
         );
 
-        let main_context = glib::MainContext::ref_thread_default();
-
         // Connect to DBus and register all our objects for search providers.
-        let connection = main_context.block_on(async {
+        let connection = glib::MainContext::default().block_on(async {
             PROVIDERS
                 .iter()
                 .filter_map(|provider| {
@@ -154,7 +152,7 @@ fn main() -> Result<()> {
         })?;
 
         // Manually tick the connection on the glib mainloop to make all code in zbus run on the mainloop.
-        main_context.spawn(tick(connection.clone()));
+        glib::MainContext::default().spawn(tick(connection.clone()));
 
         event!(
             Level::INFO,
@@ -170,7 +168,7 @@ fn main() -> Result<()> {
                 documentation: vec![env!("CARGO_PKG_HOMEPAGE").to_string()],
             },
         );
-        let mainloop = glib::MainLoop::new(Some(&main_context), false);
+        let mainloop = glib::MainLoop::new(None, false);
 
         // Quit our mainloop on SIGTERM and SIGINT
         glib::source::unix_signal_add(
