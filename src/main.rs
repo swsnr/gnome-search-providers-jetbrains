@@ -8,22 +8,24 @@
 
 //! Gnome search provider for Jetbrains products
 
+use crate::launchservice::{App, AppLaunchService, SystemdScopeSettings};
 use anyhow::{Context, Result};
+use providers::*;
+use reload::*;
+use searchprovider::*;
+use std::fs::File;
+use std::os::fd::AsFd;
+use std::os::linux::fs::MetadataExt;
 use tracing::{event, Level};
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::{fmt, EnvFilter, Registry};
 
 mod config;
 mod launchservice;
-mod logcontrol;
-mod logging;
 mod providers;
 mod reload;
 mod searchprovider;
 mod systemd;
-
-use crate::launchservice::{App, AppLaunchService, SystemdScopeSettings};
-use providers::*;
-use reload::*;
-use searchprovider::*;
 
 /// The name to request on the bus.
 const BUSNAME: &str = "de.swsnr.searchprovider.Jetbrains";
@@ -32,6 +34,23 @@ async fn tick(connection: zbus::Connection) {
     loop {
         connection.executor().tick().await
     }
+}
+
+/// Check whether this process is directly connected to the systemd journal.
+///
+/// We inspect `$JOURNAL_STREAM` and compare it against the device and inode numbers of
+/// stderr; see `systemd.exec(5)` for details.
+fn connected_to_journal() -> bool {
+    let var_os = std::env::var_os("JOURNAL_STREAM");
+    // TODO: We could perhaps do better, i.e. without duplicating the FD
+    let fd_text = std::io::stderr()
+        .as_fd()
+        .try_clone_to_owned()
+        .map(File::from)
+        .and_then(|f| f.metadata())
+        .ok()
+        .map(|m| format!("{}:{}", m.st_dev(), m.st_ino()).into());
+    var_os.as_ref().map(|os| os.to_string_lossy()) == fd_text
 }
 
 fn app() -> clap::Command {
@@ -61,7 +80,24 @@ fn main() -> Result<()> {
         }
         Ok(())
     } else {
-        let log_control = logging::setup_logging_for_service();
+        // Setup tracing: If we're connected to systemd, directly log to the journal, otherwise log nicely to the TTY.
+        let subscriber = Registry::default().with(
+            EnvFilter::try_from_default_env()
+                .or_else(|_| EnvFilter::try_new("info"))
+                .unwrap(),
+        );
+        if connected_to_journal() {
+            let journal = tracing_journald::Layer::new()
+                .with_context(|| "Failed to contact journald for logging".to_string())?;
+            tracing::subscriber::set_global_default(subscriber.with(journal)).unwrap();
+        } else {
+            tracing::subscriber::set_global_default(subscriber.with(fmt::layer().pretty()))
+                .unwrap();
+        }
+        // Direct glib to rust log, and…
+        glib::log_set_default_handler(glib::rust_log_handler);
+        // …rust log to tracing.
+        tracing_log::LogTracer::init().unwrap();
 
         event!(
             Level::INFO,
@@ -111,7 +147,6 @@ fn main() -> Result<()> {
                     },
                 )?
                 .serve_at("/", ReloadAll)?
-                .serve_at("/org/freedesktop/LogControl1", log_control)?
                 .name(BUSNAME)?
                 .build()
                 .await

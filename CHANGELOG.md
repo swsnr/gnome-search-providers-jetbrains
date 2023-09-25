@@ -9,6 +9,9 @@ and this project doesn't really care for versioning.
 ### Fixed
 - Correctly read project names.
 
+### Removed
+- Remove `LogControl` interface, as I never needed it or used it in fact.
+
 ## [1.14.0] – 2023-09-14
 
 ### Added
