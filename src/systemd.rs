@@ -6,7 +6,6 @@
 
 //! Systemd utilities.
 
-use tracing::{debug, trace};
 use zbus::dbus_proxy;
 use zbus::zvariant::{OwnedObjectPath, Value};
 
@@ -62,7 +61,7 @@ pub struct ScopeProperties<'a> {
 ///
 /// See section "STRING ESCAPING FOR INCLUSION IN UNIT NAMES" in `systemd.unit(5)`
 /// for details about the algorithm.
-fn escape_name(name: &str) -> String {
+pub fn escape_name(name: &str) -> String {
     if name.is_empty() {
         "".to_string()
     } else {
@@ -80,73 +79,4 @@ fn escape_name(name: &str) -> String {
             .collect::<Vec<_>>()
             .join("")
     }
-}
-
-/// Start a new systemd application scope for a running process.
-///
-/// `properties` provides the name and the metadata for the new scope.
-///
-/// `pid` is the process ID of the process to move into a new scope. Systemd uses an unsigned integer
-/// to represent PIDs in its DBus interface, unlike the Linux system interface which used a signed
-/// `pid_t` type.
-///
-/// Return the complete name and the DBUS object path of the new scope unit if successful.
-pub async fn start_app_scope(
-    manager: &Systemd1ManagerProxy<'_>,
-    properties: ScopeProperties<'_>,
-    pid: u32,
-) -> zbus::Result<(String, OwnedObjectPath)> {
-    // See https://gitlab.gnome.org/jf/start-transient-unit/-/blob/117c6f32c8dc0d1f28686408f698632aa71880bc/rust/src/main.rs#L94
-    // for inspiration.
-    // See https://www.freedesktop.org/wiki/Software/systemd/ControlGroupInterface/ for background.
-    let mut props = vec![
-        // I haven't found any documentation for the type of the PIDs property directly, but elsewhere
-        // in its DBus interface system always used u32 for PIDs.
-        ("PIDs", Value::Array(vec![pid].into())),
-        // libgnome passes this property too, see
-        // https://gitlab.gnome.org/GNOME/gnome-desktop/-/blob/106a729c3f98b8ee56823a0a49fa8504f78dd355/libgnome-desktop/gnome-systemd.c#L100
-        //
-        // I'm not entirely sure how it's relevant but it seems a good idea to do what Gnome does.
-        ("CollectMode", Value::Str("inactive-or-failed".into())),
-    ];
-    if let Some(description) = properties.description {
-        props.push(("Description", Value::Str(description.into())));
-    }
-    if !properties.documentation.is_empty() {
-        props.push((
-            "Documentation",
-            Value::Array(properties.documentation.into()),
-        ))
-    }
-    // This is roughly what Gnome itself does when it moves a new process to a systemd scope, see
-    // https://gitlab.gnome.org/GNOME/gnome-desktop/-/blob/106a729c3f98b8ee56823a0a49fa8504f78dd355/libgnome-desktop/gnome-systemd.c#L81
-    //
-    // Gnome Shell uses a the app-gnome prefix; we make the prefix configurable to allow callers to identify their new scopes.
-    let name = format!(
-        "{}-{}-{}.scope",
-        properties.prefix,
-        escape_name(properties.name),
-        pid
-    );
-    debug!("Creating new scope {} for {}", &name, pid);
-
-    // We `fail` to start the scope if it already exists.
-    let mode = "fail";
-    let aux = &[];
-    trace!(
-        "StartTransientUnit({}, {}, {:?}, {:?})",
-        name,
-        mode,
-        props,
-        aux
-    );
-    let result = manager.start_transient_unit(&name, mode, &props, aux).await;
-    trace!(
-        "StartTransientUnit({}, {}, {:?}, []) -> {:?}",
-        name,
-        mode,
-        props,
-        result
-    );
-    result.map(|objpath| (name, objpath))
 }

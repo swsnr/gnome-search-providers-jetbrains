@@ -8,20 +8,20 @@
 
 //! Gnome search provider for Jetbrains products
 
-use crate::launchservice::{App, AppLaunchService, SystemdScopeSettings};
-use anyhow::{Context, Result};
-use providers::*;
-use reload::*;
-use searchprovider::*;
 use std::fs::File;
 use std::os::fd::AsFd;
 use std::os::linux::fs::MetadataExt;
+
+use anyhow::{Context, Result};
 use tracing::{event, Level};
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::{fmt, EnvFilter, Registry};
 
+use providers::*;
+use reload::*;
+use searchprovider::*;
+
 mod config;
-mod launchservice;
 mod providers;
 mod reload;
 mod searchprovider;
@@ -106,7 +106,6 @@ fn main() -> Result<()> {
             env!("CARGO_PKG_VERSION")
         );
 
-        let launch_service = AppLaunchService::new();
         event!(
             Level::DEBUG,
             "Connecting to session bus, registering interfaces for search providers, and acquiring {}",
@@ -122,7 +121,6 @@ fn main() -> Result<()> {
                         event!(Level::INFO, "Found app {}", provider.desktop_id);
                         let mut search_provider = JetbrainsProductSearchProvider::new(
                             App::from(gio_app),
-                            launch_service.client(),
                             &provider.config,
                         );
                         let _ = search_provider.reload_items();
@@ -160,14 +158,6 @@ fn main() -> Result<()> {
             BUSNAME
         );
 
-        let _ = launch_service.start(
-            connection,
-            SystemdScopeSettings {
-                prefix: concat!("app-", env!("CARGO_BIN_NAME")).to_string(),
-                started_by: env!("CARGO_BIN_NAME").to_string(),
-                documentation: vec![env!("CARGO_PKG_HOMEPAGE").to_string()],
-            },
-        );
         let mainloop = glib::MainLoop::new(None, false);
 
         // Quit our mainloop on SIGTERM and SIGINT

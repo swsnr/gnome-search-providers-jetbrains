@@ -7,16 +7,95 @@
 //! The search provider service for recent projects in Jetbrains products.
 
 use crate::config::ConfigLocation;
-use crate::launchservice::{App, AppId, AppLaunchClient};
+use crate::systemd;
+use crate::systemd::Systemd1ManagerProxy;
 use anyhow::{Context, Result};
 use elementtree::Element;
+use gio::prelude::*;
+use glib::{Variant, VariantDict};
 use indexmap::IndexMap;
 use std::collections::HashMap;
+use std::fmt::{Display, Formatter};
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
-use tracing::{event, instrument, Level};
+use tracing::{event, instrument, span, Level, Span};
+use tracing_futures::Instrument;
+use zbus::zvariant::{OwnedObjectPath, Value};
 use zbus::{dbus_interface, zvariant};
+
+/// The desktop ID of an app.
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct AppId(String);
+
+impl Display for AppId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl TryFrom<&AppId> for gio::DesktopAppInfo {
+    type Error = glib::Error;
+
+    fn try_from(value: &AppId) -> Result<Self, Self::Error> {
+        gio::DesktopAppInfo::new(&value.0).ok_or_else(|| {
+            glib::Error::new(
+                glib::FileError::Noent,
+                &format!("App {} not found", value.0),
+            )
+        })
+    }
+}
+
+impl From<String> for AppId {
+    fn from(v: String) -> Self {
+        Self(v)
+    }
+}
+
+impl From<&str> for AppId {
+    fn from(v: &str) -> Self {
+        v.to_string().into()
+    }
+}
+
+impl From<&gio::DesktopAppInfo> for AppId {
+    fn from(app: &gio::DesktopAppInfo) -> Self {
+        AppId(app.id().unwrap().to_string())
+    }
+}
+
+/// An app that can be launched.
+#[derive(Debug)]
+pub struct App {
+    /// The ID of this app
+    id: AppId,
+    /// The icon to use for this app
+    icon: String,
+}
+
+impl App {
+    /// The ID of this app.
+    pub fn id(&self) -> &AppId {
+        &self.id
+    }
+
+    /// The icon of this app.
+    pub fn icon(&self) -> &str {
+        &self.icon
+    }
+}
+
+impl From<gio::DesktopAppInfo> for App {
+    fn from(app: gio::DesktopAppInfo) -> Self {
+        Self {
+            id: (&app).into(),
+            icon: IconExt::to_string(&app.icon().unwrap())
+                .unwrap()
+                .to_string(),
+        }
+    }
+}
 
 /// Read paths of all recent projects from the given `reader`.
 fn parse_recent_jetbrains_projects<R: Read>(home: &str, reader: R) -> Result<Vec<String>> {
@@ -158,8 +237,151 @@ fn read_recent_items(
 pub struct JetbrainsProductSearchProvider {
     app: App,
     items: IndexMap<String, JetbrainsRecentProject>,
-    launcher: AppLaunchClient,
     config: &'static ConfigLocation<'static>,
+}
+
+fn get_pid(platform_data: &Variant) -> Option<i32> {
+    match platform_data.get::<VariantDict>() {
+        None => {
+            event!(
+                Level::ERROR,
+                "platform_data not a dictionary, but {:?}",
+                platform_data
+            );
+            None
+        }
+        // The type of the pid property doesn't seem to be documented anywhere, but variant type
+        // errors indicate that the type is "i", i.e.gint32.
+        //
+        // See https://docs.gtk.org/glib/gvariant-format-strings.html#numeric-types
+        Some(data) => match data.lookup::<i32>("pid") {
+            Err(type_error) => {
+                event!(
+                    Level::ERROR,
+                    "platform_data.pid had type {:?}, but expected {:?}",
+                    type_error.actual,
+                    type_error.expected
+                );
+                None
+            }
+            Ok(None) => {
+                event!(
+                    Level::WARN,
+                    "pid missing in platform_data {:?}",
+                    platform_data
+                );
+                None
+            }
+            Ok(Some(pid)) => Some(pid),
+        },
+    }
+}
+
+#[instrument(skip(connection))]
+async fn move_to_scope(
+    connection: &zbus::Connection,
+    app_name: &str,
+    pid: u32,
+) -> Result<(String, OwnedObjectPath), zbus::Error> {
+    let manager = Systemd1ManagerProxy::new(connection).await?;
+    // See https://gitlab.gnome.org/jf/start-transient-unit/-/blob/117c6f32c8dc0d1f28686408f698632aa71880bc/rust/src/main.rs#L94
+    // for inspiration.
+    // See https://www.freedesktop.org/wiki/Software/systemd/ControlGroupInterface/ for background.
+    let props = &[
+        // I haven't found any documentation for the type of the PIDs property directly, but elsewhere
+        // in its DBus interface system always used u32 for PIDs.
+        ("PIDs", Value::Array(vec![pid].into())),
+        // libgnome passes this property too, see
+        // https://gitlab.gnome.org/GNOME/gnome-desktop/-/blob/106a729c3f98b8ee56823a0a49fa8504f78dd355/libgnome-desktop/gnome-systemd.c#L100
+        //
+        // I'm not entirely sure how it's relevant but it seems a good idea to do what Gnome does.
+        ("CollectMode", Value::Str("inactive-or-failed".into())),
+    ];
+    let name = format!(
+        "app-{}-{}-{}.scope",
+        env!("CARGO_BIN_NAME"),
+        systemd::escape_name(app_name.trim_end_matches(".desktop")),
+        pid
+    );
+    event!(
+        Level::DEBUG,
+        "Creating new scope {name} for PID {pid} of {app_name} with {props:?}"
+    );
+    let scope_object_path = manager
+        .start_transient_unit(&name, "fail", props, &[])
+        .await?;
+    Ok((name, scope_object_path))
+}
+
+/// Launch the given app, optionally passing a given URI.
+///
+/// Move the launched app to a dedicated systemd scope for resource control, and return the result
+/// of launching the app.
+#[instrument(skip(connection))]
+async fn launch_app_in_new_scope(
+    connection: zbus::Connection,
+    app_id: AppId,
+    uri: Option<String>,
+) -> zbus::fdo::Result<()> {
+    let context = gio::AppLaunchContext::new();
+    let span = Span::current();
+    context.connect_launched(move |_, app, platform_data| {
+        let app_id = app.id().unwrap().to_string();
+        let span = span!(parent: &span, Level::INFO, "launched", %app_id, %platform_data);
+        let _guard = span.enter();
+        // TODO: Create a new span for the launched signal
+        // TODO: Dispose launch context after this signal was received, or find a way to share it.
+        event!(
+            Level::TRACE,
+            "App {} launched with platform_data: {:?}",
+            app_id,
+            platform_data
+        );
+        if let Some(pid) = get_pid(platform_data) {
+            event!(
+                Level::INFO,
+                "App {} launched with PID {pid}",
+                app.id().unwrap()
+            );
+            let app_name = app.id().unwrap().to_string();
+            let connection_inner = connection.clone();
+            glib::MainContext::ref_thread_default().spawn(
+                async move {
+                    match move_to_scope(&connection_inner, &app_name, pid as u32).await {
+                        Err(err) => {
+                            event!(Level::ERROR, "Failed to move running process {pid} of app {app_name} into new systemd scope: {err}");
+                        },
+                        Ok((name, path)) => {
+                            event!(Level::INFO, "Moved running process {pid} of app {app_name} into new systemd scope {name} at {}", path.into_inner());
+                        },
+                    }
+                }.instrument(span.clone()),
+            );
+        }
+    });
+    let app = gio::DesktopAppInfo::try_from(&app_id).map_err(|error| {
+        event!(
+            Level::ERROR,
+            %error,
+            "Failed to find app {app_id}: {error:#}"
+        );
+        zbus::fdo::Error::Failed(format!("Failed to find app {app_id}: {error}"))
+    })?;
+    match uri {
+        None => app.launch_uris_future(&[], Some(&context)),
+        Some(ref uri) => app.launch_uris_future(&[uri], Some(&context)),
+    }
+    .await
+    .map_err(|error| {
+        event!(
+            Level::ERROR,
+            %error,
+            "Failed to launch app {app_id} with {uri:?}: {error:#}",
+        );
+        zbus::fdo::Error::Failed(format!(
+            "Failed to launch app {app_id} with {uri:?}: {error}"
+        ))
+    })
 }
 
 impl JetbrainsProductSearchProvider {
@@ -170,14 +392,9 @@ impl JetbrainsProductSearchProvider {
     /// its configuration.
     ///
     /// `pool` is a thread pool to run IO on.
-    pub fn new(
-        app: App,
-        launcher: AppLaunchClient,
-        config: &'static ConfigLocation<'static>,
-    ) -> Self {
+    pub fn new(app: App, config: &'static ConfigLocation<'static>) -> Self {
         Self {
             app,
-            launcher,
             config,
             items: IndexMap::new(),
         }
@@ -192,6 +409,29 @@ impl JetbrainsProductSearchProvider {
     pub fn reload_items(&mut self) -> Result<()> {
         self.items = read_recent_items(self.config, self.app.id())?;
         Ok(())
+    }
+
+    #[instrument(skip(self, connection), fields(app_id = %self.app.id()))]
+    async fn launch_app_on_default_main_context(
+        &self,
+        connection: zbus::Connection,
+        uri: Option<String>,
+    ) -> zbus::fdo::Result<()> {
+        let app_id = self.app.id().clone();
+        let span = Span::current();
+        glib::MainContext::default()
+            .spawn_from_within(move || {
+                launch_app_in_new_scope(connection, app_id, uri.clone()).instrument(span)
+            })
+            .await
+            .map_err(|error| {
+                event!(
+                    Level::ERROR,
+                    %error,
+                    "Join from main loop failed: {error:#}",
+                );
+                zbus::fdo::Error::Failed(format!("Join from main loop failed: {error:#}",))
+            })?
     }
 }
 
@@ -319,9 +559,10 @@ impl JetbrainsProductSearchProvider {
     /// The arguments are the result ID, the current search terms and a timestamp.
     ///
     /// Launches the underlying app with the path to the selected item.
-    #[instrument(skip(self), fields(app_id = %self.app.id()))]
+    #[instrument(skip(self, connection), fields(app_id = %self.app.id()))]
     async fn activate_result(
         &mut self,
+        #[zbus(connection)] connection: &zbus::Connection,
         item_id: &str,
         terms: Vec<&str>,
         timestamp: u32,
@@ -336,25 +577,11 @@ impl JetbrainsProductSearchProvider {
         );
         if let Some(item) = self.items.get(item_id) {
             event!(Level::INFO, item_id, "Launching recent item {:?}", item);
-            self.launcher
-                .launch_uri(self.app.id().clone(), item.directory.clone())
-                .await
-                .map_err(|error| {
-                    event!(
-                        Level::ERROR,
-                        %error,
-                        "Failed to launch app {} for {:?}: {:#}",
-                        self.app.id(),
-                        item.directory,
-                        error
-                    );
-                    zbus::fdo::Error::Failed(format!(
-                        "Failed to launch app {} for {}: {}",
-                        self.app.id(),
-                        item.directory,
-                        error
-                    ))
-                })
+            self.launch_app_on_default_main_context(
+                connection.clone(),
+                Some(item.directory.clone()),
+            )
+            .await
         } else {
             event!(Level::ERROR, item_id, "Item not found");
             Err(zbus::fdo::Error::Failed(format!(
@@ -369,20 +596,16 @@ impl JetbrainsProductSearchProvider {
     /// The arguments are the current search terms and a timestamp.
     ///
     /// Currently it simply launches the app without any arguments.
-    #[instrument(skip(self), fields(app_id = %self.app.id()))]
-    async fn launch_search(&self, _terms: Vec<String>, _timestamp: u32) -> zbus::fdo::Result<()> {
+    #[instrument(skip(self, connection), fields(app_id = %self.app.id()))]
+    async fn launch_search(
+        &self,
+        #[zbus(connection)] connection: &zbus::Connection,
+        _terms: Vec<String>,
+        _timestamp: u32,
+    ) -> zbus::fdo::Result<()> {
         event!(Level::DEBUG, "Launching app directly");
-        self.launcher
-            .launch_app(self.app.id().clone())
+        self.launch_app_on_default_main_context(connection.clone(), None)
             .await
-            .map_err(|error| {
-                event!(Level::ERROR, %error, "Failed to launch app {}: {:#}", self.app.id(), error);
-                zbus::fdo::Error::Failed(format!(
-                    "Failed to launch app {}: {}",
-                    self.app.id(),
-                    error
-                ))
-            })
     }
 }
 

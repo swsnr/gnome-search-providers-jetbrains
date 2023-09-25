@@ -655,7 +655,6 @@ dependencies = [
  "clap",
  "configparser",
  "elementtree",
- "futures-channel",
  "gio",
  "glib",
  "indexmap",
