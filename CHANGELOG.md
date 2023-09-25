@@ -6,6 +6,9 @@ and this project doesn't really care for versioning.
 
 ## [Unreleased]
 
+### Changed
+- Refactored internals a lot to simplify code.
+
 ### Fixed
 - Correctly read project names.
 
