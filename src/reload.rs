@@ -17,7 +17,7 @@ pub struct ReloadAll;
 #[dbus_interface(name = "de.swsnr.searchprovider.ReloadAll")]
 impl ReloadAll {
     /// Refresh all items in the search provider.
-    #[instrument(skip(self))]
+    #[instrument(skip(self, server))]
     pub async fn reload_all(
         &self,
         #[zbus(object_server)] server: &ObjectServer,
