@@ -188,7 +188,7 @@ pub struct JetbrainsRecentProject {
 }
 
 #[instrument(fields(app_id = %app_id))]
-fn read_recent_items(
+fn read_recent_projects(
     config: &ConfigLocation<'_>,
     app_id: &AppId,
 ) -> Result<IndexMap<String, JetbrainsRecentProject>> {
@@ -208,12 +208,12 @@ fn read_recent_items(
             let home_s = home
                 .to_str()
                 .with_context(|| "Failed to convert home directory path to UTF-8 string")?;
-            let mut items = IndexMap::new();
+            let mut recent_projects = IndexMap::new();
             for path in parse_recent_jetbrains_projects(home_s, &mut source)? {
                 if let Some(name) = get_project_name(&path) {
                     event!(Level::TRACE, %app_id, "Found project {} at {}", name, path);
                     let id = format!("jetbrains-recent-project-{app_id}-{path}");
-                    items.insert(
+                    recent_projects.insert(
                         id,
                         JetbrainsRecentProject {
                             name,
@@ -224,21 +224,14 @@ fn read_recent_items(
                     event!(Level::TRACE, %app_id, "Skipping {}, failed to determine project name", path);
                 }
             }
-            event!(Level::INFO, %app_id, "Found {} recent project(s) for app {}", items.len(), app_id);
-            Ok(items)
+            event!(Level::INFO, %app_id, "Found {} recent project(s) for app {}", recent_projects.len(), app_id);
+            Ok(recent_projects)
         }
         Err(error) => {
-            event!(Level::DEBUG, %error, "No recent items available: {:#}", error);
+            event!(Level::DEBUG, %error, "No recent project available: {:#}", error);
             Ok(IndexMap::new())
         }
     }
-}
-
-#[derive(Debug)]
-pub struct JetbrainsProductSearchProvider {
-    app: App,
-    items: IndexMap<String, JetbrainsRecentProject>,
-    config: &'static ConfigLocation<'static>,
 }
 
 fn get_pid(platform_data: &Variant) -> Option<i32> {
@@ -381,19 +374,24 @@ async fn launch_app_in_new_scope(
     })
 }
 
+/// A search provider for recent Jetbrains products.
+#[derive(Debug)]
+pub struct JetbrainsProductSearchProvider {
+    app: App,
+    recent_projects: IndexMap<String, JetbrainsRecentProject>,
+    config: &'static ConfigLocation<'static>,
+}
+
 impl JetbrainsProductSearchProvider {
     /// Create a new search provider for a jetbrains product.
     ///
-    /// `app` describes the underlying app to launch items with, and `launcher` providers a service
-    /// to launch apps from the Glib main loop.  `config` describes where this Jetbrains product has
-    /// its configuration.
-    ///
-    /// `pool` is a thread pool to run IO on.
+    /// `app` describes the underlying app to launch projects with, and `config` describes
+    /// where this Jetbrains product has its configuration.
     pub fn new(app: App, config: &'static ConfigLocation<'static>) -> Self {
         Self {
             app,
             config,
-            items: IndexMap::new(),
+            recent_projects: IndexMap::new(),
         }
     }
 
@@ -402,9 +400,9 @@ impl JetbrainsProductSearchProvider {
         &self.app
     }
 
-    /// Reload all recent items provided by this search provider.
-    pub fn reload_items(&mut self) -> Result<()> {
-        self.items = read_recent_items(self.config, self.app.id())?;
+    /// Reload all recent projects provided by this search provider.
+    pub fn reload_recent_projects(&mut self) -> Result<()> {
+        self.recent_projects = read_recent_projects(self.config, self.app.id())?;
         Ok(())
     }
 
@@ -432,24 +430,24 @@ impl JetbrainsProductSearchProvider {
     }
 }
 
-/// Calculate how well `item` matches all of the given `terms`.
+/// Calculate how well `recent_projects` matches all of the given `terms`.
 ///
-/// If all terms match the name of the `item`, the item receives a base score of 10.
-/// If all terms match the directory of the `item`, the items gets scored for each term according to
-/// how far right the term appears in the directory, under the assumption that the right most part
-/// of a directory path is the most specific.
+/// If all terms match the name of the `recent_projects`, the project receives a base score of 10.
+/// If all terms match the directory of the `recent_projects`, the project gets scored for each
+/// term according to how far right the term appears in the directory, under the assumption that
+/// the right most part of a directory path is the most specific.
 ///
 /// All matches are done on the lowercase text, i.e. case insensitve.
-fn item_score(item: &JetbrainsRecentProject, terms: &[&str]) -> f64 {
-    let name = item.name.to_lowercase();
-    let directory = item.directory.to_lowercase();
+fn score_recent_project(recent_project: &JetbrainsRecentProject, terms: &[&str]) -> f64 {
+    let name = recent_project.name.to_lowercase();
+    let directory = recent_project.directory.to_lowercase();
     terms
         .iter()
         .try_fold(0.0, |score, term| {
             directory
                 .rfind(&term.to_lowercase())
                 // We add 1 to avoid returning zero if the term matches right at the beginning.
-                .map(|index| score + ((index + 1) as f64 / item.directory.len() as f64))
+                .map(|index| score + ((index + 1) as f64 / recent_project.directory.len() as f64))
         })
         .unwrap_or(0.0)
         + if terms.iter().all(|term| name.contains(&term.to_lowercase())) {
@@ -473,10 +471,10 @@ impl JetbrainsProductSearchProvider {
     fn get_initial_result_set(&self, terms: Vec<&str>) -> Vec<&str> {
         event!(Level::DEBUG, "Searching for {:?}", terms);
         let mut scored_ids = self
-            .items
+            .recent_projects
             .iter()
             .filter_map(|(id, item)| {
-                let score = item_score(item, &terms);
+                let score = score_recent_project(item, &terms);
                 if 0.0 < score {
                     Some((id.as_ref(), score))
                 } else {
@@ -535,7 +533,7 @@ impl JetbrainsProductSearchProvider {
         event!(Level::DEBUG, "Getting meta info for {:?}", results);
         let mut metas = Vec::with_capacity(results.len());
         for item_id in results {
-            if let Some(item) = self.items.get(&item_id) {
+            if let Some(item) = self.recent_projects.get(&item_id) {
                 event!(Level::DEBUG, %item_id, "Compiling meta info for {}", item_id);
                 let mut meta: HashMap<String, zvariant::Value> = HashMap::new();
                 meta.insert("id".to_string(), item_id.clone().into());
@@ -572,7 +570,7 @@ impl JetbrainsProductSearchProvider {
             terms,
             timestamp
         );
-        if let Some(item) = self.items.get(item_id) {
+        if let Some(item) = self.recent_projects.get(item_id) {
             event!(Level::INFO, item_id, "Launching recent item {:?}", item);
             self.launch_app_on_default_main_context(
                 connection.clone(),
@@ -615,10 +613,11 @@ mod tests {
     fn read_recent_projects() {
         let data: &[u8] = include_bytes!("tests/recentProjects.xml");
         let home = glib::home_dir();
-        let items = parse_recent_jetbrains_projects(home.to_str().unwrap(), data).unwrap();
+        let recent_projects =
+            parse_recent_jetbrains_projects(home.to_str().unwrap(), data).unwrap();
 
         assert_eq!(
-            items,
+            recent_projects,
             vec![
                 home.join("Code")
                     .join("gh")
@@ -638,10 +637,11 @@ mod tests {
     fn read_recent_solutions() {
         let data: &[u8] = include_bytes!("tests/recentSolutions.xml");
         let home = glib::home_dir();
-        let items = parse_recent_jetbrains_projects(home.to_str().unwrap(), data).unwrap();
+        let recent_projects =
+            parse_recent_jetbrains_projects(home.to_str().unwrap(), data).unwrap();
 
         assert_eq!(
-            items,
+            recent_projects,
             vec![
                 home.join("Code")
                     .join("gh")

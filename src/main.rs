@@ -124,7 +124,7 @@ fn main() -> Result<()> {
                             App::from(gio_app),
                             &provider.config,
                         );
-                        let _ = search_provider.reload_items();
+                        let _ = search_provider.reload_recent_projects();
                         (provider.objpath(), search_provider)
                     })
                 })
