@@ -9,6 +9,9 @@ and this project doesn't really care for versioning.
 ### Added
 - Restore log control interface.
 
+### Changed
+- Update all dependencies.
+
 ## [1.15.0] – 2023-09-25
 
 ### Changed
