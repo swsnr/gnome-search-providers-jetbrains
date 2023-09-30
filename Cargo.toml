@@ -39,11 +39,11 @@ configparser = "3.0.2"
 publish = false
 # Only release from main
 allow-branch = ["main"]
-
+# Don't build before release; that's what CI does.
+verify = false
 # Use the same tag for all crates in this workspace.
 # crates in crates/ use tag = false
 tag-name = "v{{version}}"
-
 # I prefer these messages over the default (cargo-release) messages
 tag-message = "Version {{tag_name}}"
 pre-release-commit-message = "Release {{version}}"
