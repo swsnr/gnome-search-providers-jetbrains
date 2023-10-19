@@ -12,6 +12,7 @@ Supports
 - CLion (toolbox)
 - GoLand (toolbox)
 - IDEA (toolbox)
+- IDEA Community Edition (Arch package)
 - IDEA Community Edition (toolbox)
 - PHPStorm (toolbox)
 - PyCharm (toolbox)
@@ -34,17 +35,17 @@ Under the hood this is a small systemd user service which implements the [search
 
 1. Install [rust](https://www.rust-lang.org/tools/install)
 
-   **Note:** This program depends on Glib and Gio.  Building requires the corresponding headers to be installed.
+   **Note:** This program depends on Glib and Gio. Building requires the corresponding headers to be installed.
 
 2. Build `make build`
 3. Install `sudo make install`
-   
+
    This installs to `/usr/local/`.
 
    **Note:** You really do need to install as `root`, system-wide.
    A per-user installation to `$HOME` does not work as of Gnome 40, because Gnome shell doesn't load search providers from `$HOME` (see <https://gitlab.gnome.org/GNOME/gnome-shell/-/issues/3060>).
 
-## Uninstallation 
+## Uninstallation
 
 To uninstall use `sudo make uninstall`.
 

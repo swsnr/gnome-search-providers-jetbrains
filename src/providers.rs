@@ -78,6 +78,16 @@ pub const PROVIDERS: &[ProviderDefinition] = &[
         },
     },
     ProviderDefinition {
+        label: "IDEA Community Edition (Arch package)",
+        desktop_id: "idea.desktop",
+        relative_obj_path: "arch/ideace",
+        config: ConfigLocation {
+            vendor_dir: "JetBrains",
+            config_prefix: "IdeaIC",
+            projects_filename: "recentProjects.xml",
+        },
+    },
+    ProviderDefinition {
         label: "PHPStorm (toolbox)",
         desktop_id: "jetbrains-phpstorm.desktop",
         relative_obj_path: "toolbox/phpstorm",
