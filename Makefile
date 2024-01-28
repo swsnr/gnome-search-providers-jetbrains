@@ -23,11 +23,3 @@ install:
 	install -Dm644 -t $(DESTDIR)$(USERUNITDIR) systemd/gnome-search-providers-jetbrains.service
 	install -Dm644 -t $(DESTDIR)$(DBUS_SERVICES_DIR) dbus-1/de.swsnr.searchprovider.Jetbrains.service
 	install -Dm755 -t $(DESTDIR)$(BINDIR) target/release/gnome-search-providers-jetbrains
-
-.PHONY: uninstall
-uninstall:
-	rm -f $(addprefix $(DESTDIR)$(SEARCH_PROVIDERS_DIR)/,$(notdir $(SEARCH_PROVIDERS)))
-	rm -rf $(DESTDIR)$(BINDIR)/
-	rm -f $(DESTDIR)$(USERUNITDIR)/gnome-search-providers-jetbrains.service
-	rm -f $(DESTDIR)$(DBUS_SERVICES_DIR)/de.swsnr.searchprovider.Jetbrains.service
-
