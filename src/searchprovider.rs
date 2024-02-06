@@ -308,16 +308,12 @@ async fn move_to_scope(
     Ok((name, scope_object_path))
 }
 
-/// Launch the given app, optionally passing a given URI.
-///
-/// Move the launched app to a dedicated systemd scope for resource control, and return the result
-/// of launching the app.
-#[instrument(skip(connection))]
-async fn launch_app_in_new_scope(
-    connection: zbus::Connection,
-    app_id: AppId,
-    uri: Option<String>,
-) -> zbus::fdo::Result<()> {
+/**
+ * Create a launch context.
+ *
+ * This context moves all launched applications to their own system scope.
+ */
+fn create_launch_context(connection: zbus::Connection) -> gio::AppLaunchContext {
     let context = gio::AppLaunchContext::new();
     context.connect_launched(move |_, app, platform_data| {
         let app_id = app.id().unwrap().to_string();
@@ -346,7 +342,20 @@ async fn launch_app_in_new_scope(
             );
         }
     });
+    context
+}
 
+/// Launch the given app, optionally passing a given URI.
+///
+/// Move the launched app to a dedicated systemd scope for resource control, and return the result
+/// of launching the app.
+#[instrument(skip(connection))]
+async fn launch_app_in_new_scope(
+    connection: zbus::Connection,
+    app_id: AppId,
+    uri: Option<String>,
+) -> zbus::fdo::Result<()> {
+    let context = create_launch_context(connection);
     let app = gio::DesktopAppInfo::try_from(&app_id).map_err(|error| {
         event!(
             Level::ERROR,
