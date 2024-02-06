@@ -6,24 +6,25 @@
 
 //! The search provider service for recent projects in Jetbrains products.
 
-use crate::config::ConfigLocation;
-use crate::systemd;
-use crate::systemd::Systemd1ManagerProxy;
-use anyhow::{Context, Result};
-use elementtree::Element;
-use gio::prelude::*;
-use glib::once_cell::unsync::Lazy;
-use glib::{Variant, VariantDict};
-use indexmap::IndexMap;
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
+
+use anyhow::{Context, Result};
+use elementtree::Element;
+use gio::prelude::*;
+use glib::{Variant, VariantDict};
+use indexmap::IndexMap;
 use tracing::{event, instrument, span, Level, Span};
 use tracing_futures::Instrument;
 use zbus::zvariant::{OwnedObjectPath, Value};
 use zbus::{dbus_interface, zvariant};
+
+use crate::config::ConfigLocation;
+use crate::systemd;
+use crate::systemd::Systemd1ManagerProxy;
 
 /// The desktop ID of an app.
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -317,36 +318,33 @@ async fn launch_app_in_new_scope(
     app_id: AppId,
     uri: Option<String>,
 ) -> zbus::fdo::Result<()> {
-    let context = Lazy::new(|| {
-        let context = gio::AppLaunchContext::new();
-        context.connect_launched(move |_, app, platform_data| {
-            let app_id = app.id().unwrap().to_string();
-            let _guard = span!(Level::INFO, "launched", %app_id, %platform_data).entered();
-            event!(
-                Level::TRACE,
-                "App {} launched with platform_data: {:?}",
-                app_id,
-                platform_data
+    let context = gio::AppLaunchContext::new();
+    context.connect_launched(move |_, app, platform_data| {
+        let app_id = app.id().unwrap().to_string();
+        let _guard = span!(Level::INFO, "launched", %app_id, %platform_data).entered();
+        event!(
+            Level::TRACE,
+            "App {} launched with platform_data: {:?}",
+            app_id,
+            platform_data
+        );
+        if let Some(pid) = get_pid(platform_data) {
+            event!(Level::INFO, "App {} launched with PID {pid}", app.id().unwrap());
+            let app_name = app.id().unwrap().to_string();
+            let connection_inner = connection.clone();
+            glib::MainContext::ref_thread_default().spawn(
+                async move {
+                    match move_to_scope(&connection_inner, &app_name, pid as u32).await {
+                        Err(err) => {
+                            event!(Level::ERROR, "Failed to move running process {pid} of app {app_name} into new systemd scope: {err}");
+                        },
+                        Ok((name, path)) => {
+                            event!(Level::INFO, "Moved running process {pid} of app {app_name} into new systemd scope {name} at {}", path.into_inner());
+                        },
+                    }
+                }.in_current_span(),
             );
-            if let Some(pid) = get_pid(platform_data) {
-                event!(Level::INFO, "App {} launched with PID {pid}", app.id().unwrap());
-                let app_name = app.id().unwrap().to_string();
-                let connection_inner = connection.clone();
-                glib::MainContext::ref_thread_default().spawn(
-                    async move {
-                        match move_to_scope(&connection_inner, &app_name, pid as u32).await {
-                            Err(err) => {
-                                event!(Level::ERROR, "Failed to move running process {pid} of app {app_name} into new systemd scope: {err}");
-                            },
-                            Ok((name, path)) => {
-                                event!(Level::INFO, "Moved running process {pid} of app {app_name} into new systemd scope {name} at {}", path.into_inner());
-                            },
-                        }
-                    }.in_current_span(),
-                );
-            }
-        });
-        context
+        }
     });
 
     let app = gio::DesktopAppInfo::try_from(&app_id).map_err(|error| {
@@ -358,8 +356,8 @@ async fn launch_app_in_new_scope(
         zbus::fdo::Error::Failed(format!("Failed to find app {app_id}: {error}"))
     })?;
     match uri {
-        None => app.launch_uris_future(&[], Some(&*context)),
-        Some(ref uri) => app.launch_uris_future(&[uri], Some(&*context)),
+        None => app.launch_uris_future(&[], Some(&context)),
+        Some(ref uri) => app.launch_uris_future(&[uri], Some(&context)),
     }
     .await
     .map_err(|error| {

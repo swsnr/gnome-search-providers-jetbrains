@@ -6,12 +6,13 @@
 
 //! Jetbrains configuration helpers.
 
-use anyhow::{anyhow, Context, Result};
-use glib::once_cell::sync::OnceCell;
-use regex::Regex;
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
+use std::sync::OnceLock;
+
+use anyhow::{anyhow, Context, Result};
+use regex::Regex;
 use tracing::{event, instrument, Level};
 
 /// A path with an associated version.
@@ -28,7 +29,7 @@ impl VersionedPath {
     /// Return `None` if the path doesn't contain any valid version.
     #[instrument]
     fn extract_version(path: PathBuf) -> Option<VersionedPath> {
-        static RE: OnceCell<Regex> = OnceCell::new();
+        static RE: OnceLock<Regex> = OnceLock::new();
         let re = RE.get_or_init(|| Regex::new(r"(\d{1,4}).(\d{1,2})").unwrap());
         event!(
             Level::TRACE,

@@ -18,8 +18,8 @@ publish = false
 anyhow = { version = "1.0.75", default-features = false, features = ["std", "backtrace"] }
 clap = { version = "4.4.4", default-features = false, features = ["std", "cargo", ] }
 elementtree = "1.2.3"
-gio = { version = "0.18.2", features = ["v2_60"] }
-glib = { version = "0.18.2", features = ["log"] }
+gio = { version = "0.19.0", features = ["v2_60"] }
+glib = { version = "0.19.0", features = ["log"] }
 indexmap = "2.0.0"
 libc = "0.2.148"
 regex = { version = "1.9.5", default-features = false, features = ["std", "perf"] }
