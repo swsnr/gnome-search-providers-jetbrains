@@ -21,6 +21,7 @@ use reload::*;
 use searchprovider::*;
 
 mod config;
+mod launch;
 mod providers;
 mod reload;
 mod searchprovider;
