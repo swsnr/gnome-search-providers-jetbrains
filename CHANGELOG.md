@@ -6,6 +6,14 @@ and this project doesn't really care for versioning.
 
 ## [Unreleased]
 
+### Changed
+- Refresh recent projects (see [GH-55]).
+
+### Removed
+- Reload interface and `systemctl reload` support (see [GH-55]).
+
+[GH-55]: https://github.com/swsnr/gnome-search-providers-jetbrains/pull/55
+
 ## [1.16.0] – 2023-09-30
 
 ### Added

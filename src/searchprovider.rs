@@ -268,62 +268,6 @@ async fn launch_app_in_new_scope(
     })
 }
 
-/// A search provider for recent Jetbrains products.
-#[derive(Debug)]
-pub struct JetbrainsProductSearchProvider {
-    app: App,
-    recent_projects: IndexMap<String, JetbrainsRecentProject>,
-    config: &'static ConfigLocation<'static>,
-}
-
-impl JetbrainsProductSearchProvider {
-    /// Create a new search provider for a jetbrains product.
-    ///
-    /// `app` describes the underlying app to launch projects with, and `config` describes
-    /// where this Jetbrains product has its configuration.
-    pub fn new(app: App, config: &'static ConfigLocation<'static>) -> Self {
-        Self {
-            app,
-            config,
-            recent_projects: IndexMap::new(),
-        }
-    }
-
-    /// Get the underyling app for this Jetbrains product.
-    pub fn app(&self) -> &App {
-        &self.app
-    }
-
-    /// Reload all recent projects provided by this search provider.
-    pub fn reload_recent_projects(&mut self) -> Result<()> {
-        self.recent_projects = read_recent_projects(self.config, self.app.id())?;
-        Ok(())
-    }
-
-    #[instrument(skip(self, connection), fields(app_id = %self.app.id()))]
-    async fn launch_app_on_default_main_context(
-        &self,
-        connection: zbus::Connection,
-        uri: Option<String>,
-    ) -> zbus::fdo::Result<()> {
-        let app_id = self.app.id().clone();
-        let span = Span::current();
-        glib::MainContext::default()
-            .spawn_from_within(move || {
-                launch_app_in_new_scope(connection, app_id, uri.clone()).instrument(span)
-            })
-            .await
-            .map_err(|error| {
-                event!(
-                    Level::ERROR,
-                    %error,
-                    "Join from main loop failed: {error:#}",
-                );
-                zbus::fdo::Error::Failed(format!("Join from main loop failed: {error:#}",))
-            })?
-    }
-}
-
 /// Calculate how well `recent_projects` matches all of the given `terms`.
 ///
 /// If all terms match the name of the `recent_projects`, the project receives a base score of 10.
@@ -351,6 +295,82 @@ fn score_recent_project(recent_project: &JetbrainsRecentProject, terms: &[&str])
         }
 }
 
+/// A search provider for recent Jetbrains products.
+#[derive(Debug)]
+pub struct JetbrainsProductSearchProvider {
+    app: App,
+    recent_projects: IndexMap<String, JetbrainsRecentProject>,
+    config: &'static ConfigLocation<'static>,
+}
+
+impl JetbrainsProductSearchProvider {
+    /// Create a new search provider for a jetbrains product.
+    ///
+    /// `app` describes the underlying app to launch projects with, and `config` describes
+    /// where this Jetbrains product has its configuration.
+    pub fn new(app: App, config: &'static ConfigLocation<'static>) -> Self {
+        Self {
+            app,
+            config,
+            recent_projects: IndexMap::new(),
+        }
+    }
+
+    /// Get the underyling app for this Jetbrains product.
+    pub fn app(&self) -> &App {
+        &self.app
+    }
+
+    /// Reload all recent projects provided by this search provider.
+    fn reload_recent_projects(&mut self) -> Result<()> {
+        self.recent_projects = read_recent_projects(self.config, self.app.id())?;
+        Ok(())
+    }
+
+    /// Find all projects matching the given `terms`.
+    ///
+    /// Return a list of IDs of matching projects.
+    fn find_project_ids_by_terms(&self, terms: &[&str]) -> Vec<&str> {
+        let mut scored_ids = self
+            .recent_projects
+            .iter()
+            .filter_map(|(id, item)| {
+                let score = score_recent_project(item, terms);
+                if 0.0 < score {
+                    Some((id.as_ref(), score))
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
+        scored_ids.sort_by_key(|(_, score)| -((score * 1000.0) as i64));
+        scored_ids.into_iter().map(|(id, _)| id).collect()
+    }
+
+    #[instrument(skip(self, connection), fields(app_id = %self.app.id()))]
+    async fn launch_app_on_default_main_context(
+        &self,
+        connection: zbus::Connection,
+        uri: Option<String>,
+    ) -> zbus::fdo::Result<()> {
+        let app_id = self.app.id().clone();
+        let span = Span::current();
+        glib::MainContext::default()
+            .spawn_from_within(move || {
+                launch_app_in_new_scope(connection, app_id, uri.clone()).instrument(span)
+            })
+            .await
+            .map_err(|error| {
+                event!(
+                    Level::ERROR,
+                    %error,
+                    "Join from main loop failed: {error:#}",
+                );
+                zbus::fdo::Error::Failed(format!("Join from main loop failed: {error:#}",))
+            })?
+    }
+}
+
 /// The DBus interface of the search provider.
 ///
 /// See <https://developer.gnome.org/SearchProvider/> for information.
@@ -362,22 +382,15 @@ impl JetbrainsProductSearchProvider {
     /// and should return an array of result IDs. gnome-shell will call GetResultMetas for (some) of these result
     /// IDs to get details about the result that can be be displayed in the result list.
     #[instrument(skip(self), fields(app_id = %self.app.id()))]
-    fn get_initial_result_set(&self, terms: Vec<&str>) -> Vec<&str> {
+    fn get_initial_result_set(&mut self, terms: Vec<&str>) -> Vec<&str> {
+        event!(Level::DEBUG, "Reloading recent projects");
+        if let Err(error) = self.reload_recent_projects() {
+            // Ignore errors while reloading recent projects, and just resume
+            // search with what we've got.
+            event!(Level::ERROR, "Failed to reload recent projects: {}", error);
+        }
         event!(Level::DEBUG, "Searching for {:?}", terms);
-        let mut scored_ids = self
-            .recent_projects
-            .iter()
-            .filter_map(|(id, item)| {
-                let score = score_recent_project(item, &terms);
-                if 0.0 < score {
-                    Some((id.as_ref(), score))
-                } else {
-                    None
-                }
-            })
-            .collect::<Vec<_>>();
-        scored_ids.sort_by_key(|(_, score)| -((score * 1000.0) as i64));
-        let ids = scored_ids.into_iter().map(|(id, _)| id).collect();
+        let ids = self.find_project_ids_by_terms(&terms);
         event!(Level::DEBUG, "Found ids {:?}", ids);
         ids
     }
@@ -397,7 +410,7 @@ impl JetbrainsProductSearchProvider {
         );
         // For simplicity just run the overall search again, and filter out everything not already matched.
         let ids = self
-            .get_initial_result_set(terms)
+            .find_project_ids_by_terms(&terms)
             .into_iter()
             .filter(|id| previous_results.contains(id))
             .collect();
