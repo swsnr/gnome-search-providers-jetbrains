@@ -18,7 +18,7 @@ use gio::prelude::*;
 use indexmap::IndexMap;
 use tracing::{event, instrument, Level, Span};
 use tracing_futures::Instrument;
-use zbus::{dbus_interface, zvariant};
+use zbus::{interface, zvariant};
 
 use crate::config::ConfigLocation;
 use crate::launch::create_launch_context;
@@ -374,7 +374,7 @@ impl JetbrainsProductSearchProvider {
 /// The DBus interface of the search provider.
 ///
 /// See <https://developer.gnome.org/SearchProvider/> for information.
-#[dbus_interface(name = "org.gnome.Shell.SearchProvider2")]
+#[interface(name = "org.gnome.Shell.SearchProvider2")]
 impl JetbrainsProductSearchProvider {
     /// Starts a search.
     ///
