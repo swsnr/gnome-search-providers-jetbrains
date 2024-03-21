@@ -6,6 +6,8 @@ and this project doesn't really care for versioning.
 
 ## [Unreleased]
 
+## [1.18.0] – 2024-03-21
+
 ### Added
 - Reload interface and `systemctl reload` support (reverts [GH-55]).
 - Automatically reload recent projects every five minutes.
@@ -272,7 +274,8 @@ and this project doesn't really care for versioning.
 
 Initial prototype in Python, with support for Toolbox IDEA CE and WebStorm.
 
-[Unreleased]: https://github.com/swsnr/gnome-search-providers-jetbrains/compare/v1.17.0...HEAD
+[Unreleased]: https://github.com/swsnr/gnome-search-providers-jetbrains/compare/v1.18.0...HEAD
+[1.18.0]: https://github.com/swsnr/gnome-search-providers-jetbrains/compare/v1.17.0...v1.18.0
 [1.17.0]: https://github.com/swsnr/gnome-search-providers-jetbrains/compare/v1.16.0...v1.17.0
 [1.16.0]: https://github.com/swsnr/gnome-search-providers-jetbrains/compare/v1.15.0...v1.16.0
 [1.15.0]: https://github.com/swsnr/gnome-search-providers-jetbrains/compare/v1.14.0...v1.15.0
