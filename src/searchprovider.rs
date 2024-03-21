@@ -268,33 +268,6 @@ async fn launch_app_in_new_scope(
     })
 }
 
-/// Calculate how well `recent_projects` matches all of the given `terms`.
-///
-/// If all terms match the name of the `recent_projects`, the project receives a base score of 10.
-/// If all terms match the directory of the `recent_projects`, the project gets scored for each
-/// term according to how far right the term appears in the directory, under the assumption that
-/// the right most part of a directory path is the most specific.
-///
-/// All matches are done on the lowercase text, i.e. case insensitve.
-fn score_recent_project(recent_project: &JetbrainsRecentProject, terms: &[&str]) -> f64 {
-    let name = recent_project.name.to_lowercase();
-    let directory = recent_project.directory.to_lowercase();
-    terms
-        .iter()
-        .try_fold(0.0, |score, term| {
-            directory
-                .rfind(&term.to_lowercase())
-                // We add 1 to avoid returning zero if the term matches right at the beginning.
-                .map(|index| score + ((index + 1) as f64 / recent_project.directory.len() as f64))
-        })
-        .unwrap_or(0.0)
-        + if terms.iter().all(|term| name.contains(&term.to_lowercase())) {
-            10.0
-        } else {
-            0.0
-        }
-}
-
 /// A search provider for recent Jetbrains products.
 #[derive(Debug)]
 pub struct JetbrainsProductSearchProvider {
@@ -322,29 +295,9 @@ impl JetbrainsProductSearchProvider {
     }
 
     /// Reload all recent projects provided by this search provider.
-    fn reload_recent_projects(&mut self) -> Result<()> {
+    pub fn reload_recent_projects(&mut self) -> Result<()> {
         self.recent_projects = read_recent_projects(self.config, self.app.id())?;
         Ok(())
-    }
-
-    /// Find all projects matching the given `terms`.
-    ///
-    /// Return a list of IDs of matching projects.
-    fn find_project_ids_by_terms(&self, terms: &[&str]) -> Vec<&str> {
-        let mut scored_ids = self
-            .recent_projects
-            .iter()
-            .filter_map(|(id, item)| {
-                let score = score_recent_project(item, terms);
-                if 0.0 < score {
-                    Some((id.as_ref(), score))
-                } else {
-                    None
-                }
-            })
-            .collect::<Vec<_>>();
-        scored_ids.sort_by_key(|(_, score)| -((score * 1000.0) as i64));
-        scored_ids.into_iter().map(|(id, _)| id).collect()
     }
 
     #[instrument(skip(self, connection), fields(app_id = %self.app.id()))]
@@ -371,6 +324,33 @@ impl JetbrainsProductSearchProvider {
     }
 }
 
+/// Calculate how well `recent_projects` matches all of the given `terms`.
+///
+/// If all terms match the name of the `recent_projects`, the project receives a base score of 10.
+/// If all terms match the directory of the `recent_projects`, the project gets scored for each
+/// term according to how far right the term appears in the directory, under the assumption that
+/// the right most part of a directory path is the most specific.
+///
+/// All matches are done on the lowercase text, i.e. case insensitve.
+fn score_recent_project(recent_project: &JetbrainsRecentProject, terms: &[&str]) -> f64 {
+    let name = recent_project.name.to_lowercase();
+    let directory = recent_project.directory.to_lowercase();
+    terms
+        .iter()
+        .try_fold(0.0, |score, term| {
+            directory
+                .rfind(&term.to_lowercase())
+                // We add 1 to avoid returning zero if the term matches right at the beginning.
+                .map(|index| score + ((index + 1) as f64 / recent_project.directory.len() as f64))
+        })
+        .unwrap_or(0.0)
+        + if terms.iter().all(|term| name.contains(&term.to_lowercase())) {
+            10.0
+        } else {
+            0.0
+        }
+}
+
 /// The DBus interface of the search provider.
 ///
 /// See <https://developer.gnome.org/SearchProvider/> for information.
@@ -382,15 +362,22 @@ impl JetbrainsProductSearchProvider {
     /// and should return an array of result IDs. gnome-shell will call GetResultMetas for (some) of these result
     /// IDs to get details about the result that can be be displayed in the result list.
     #[instrument(skip(self), fields(app_id = %self.app.id()))]
-    fn get_initial_result_set(&mut self, terms: Vec<&str>) -> Vec<&str> {
-        event!(Level::DEBUG, "Reloading recent projects");
-        if let Err(error) = self.reload_recent_projects() {
-            // Ignore errors while reloading recent projects, and just resume
-            // search with what we've got.
-            event!(Level::ERROR, "Failed to reload recent projects: {}", error);
-        }
+    fn get_initial_result_set(&self, terms: Vec<&str>) -> Vec<&str> {
         event!(Level::DEBUG, "Searching for {:?}", terms);
-        let ids = self.find_project_ids_by_terms(&terms);
+        let mut scored_ids = self
+            .recent_projects
+            .iter()
+            .filter_map(|(id, item)| {
+                let score = score_recent_project(item, &terms);
+                if 0.0 < score {
+                    Some((id.as_ref(), score))
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
+        scored_ids.sort_by_key(|(_, score)| -((score * 1000.0) as i64));
+        let ids = scored_ids.into_iter().map(|(id, _)| id).collect();
         event!(Level::DEBUG, "Found ids {:?}", ids);
         ids
     }
@@ -410,7 +397,7 @@ impl JetbrainsProductSearchProvider {
         );
         // For simplicity just run the overall search again, and filter out everything not already matched.
         let ids = self
-            .find_project_ids_by_terms(&terms)
+            .get_initial_result_set(terms)
             .into_iter()
             .filter(|id| previous_results.contains(id))
             .collect();

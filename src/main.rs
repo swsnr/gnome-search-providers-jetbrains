@@ -17,11 +17,13 @@ use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::Registry;
 
 use providers::*;
+use reload::*;
 use searchprovider::*;
 
 mod config;
 mod launch;
 mod providers;
+mod reload;
 mod searchprovider;
 mod systemd;
 
@@ -104,10 +106,11 @@ fn main() -> Result<()> {
                 .filter_map(|provider| {
                     gio::DesktopAppInfo::new(provider.desktop_id).map(|gio_app| {
                         event!(Level::INFO, "Found app {}", provider.desktop_id);
-                        let search_provider = JetbrainsProductSearchProvider::new(
+                        let mut search_provider = JetbrainsProductSearchProvider::new(
                             App::from(gio_app),
                             &provider.config,
                         );
+                        let _ = search_provider.reload_recent_projects();
                         (provider.objpath(), search_provider)
                     })
                 })
@@ -126,6 +129,7 @@ fn main() -> Result<()> {
                         builder.serve_at(path, provider)
                     },
                 )?
+                .serve_at("/", ReloadAll)?
                 .serve_log_control(LogControl1::new(control))?
                 .name(BUSNAME)?
                 .build()

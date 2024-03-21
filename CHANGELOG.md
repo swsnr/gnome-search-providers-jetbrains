@@ -6,6 +6,12 @@ and this project doesn't really care for versioning.
 
 ## [Unreleased]
 
+### Added
+- Reload interface and `systemctl reload` support (reverts [GH-55]).
+
+### Changed
+- Explicitly refresh recent projects (reverts [GH-55]).
+
 ## [1.17.0] – 2024-02-12
 
 ### Changed
