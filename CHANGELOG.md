@@ -8,6 +8,7 @@ and this project doesn't really care for versioning.
 
 ### Added
 - Reload interface and `systemctl reload` support (reverts [GH-55]).
+- Automatically reload recent projects every five minutes.
 
 ### Changed
 - Explicitly refresh recent projects (reverts [GH-55]).

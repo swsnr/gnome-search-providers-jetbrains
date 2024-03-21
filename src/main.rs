@@ -36,6 +36,10 @@ async fn tick(connection: zbus::Connection) {
     }
 }
 
+async fn reload(connection: zbus::Connection) {
+    let _ = reload_all_on_object_server(&connection.object_server()).await;
+}
+
 fn app() -> clap::Command {
     use clap::*;
     command!()
@@ -139,6 +143,16 @@ fn main() -> Result<()> {
 
         // Manually tick the connection on the glib mainloop to make all code in zbus run on the mainloop.
         glib::MainContext::default().spawn(tick(connection.clone()));
+
+        // Automatically reload all providers every five minutes, on grounds that
+        // if you create a new project you're probably going to work with it for
+        // at least a few minutes, so it doesn't matter if it only appears in
+        // search results after a few minutes.
+        glib::timeout_add_seconds(5 * 60, move || {
+            event!(Level::INFO, "Scheduling reload all providers on timeout");
+            glib::MainContext::default().spawn(reload(connection.clone()));
+            glib::ControlFlow::Continue
+        });
 
         event!(
             Level::INFO,
