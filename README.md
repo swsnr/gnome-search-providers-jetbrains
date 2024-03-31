@@ -1,5 +1,7 @@
 # Gnome search provider for Jetbrains projects
 
+**I no longer use or maintain this code.**
+
 Add recent projects of various Jetbrains IDEs to Gnome search.
 
 **Note:** This project is not affiliated with or endorsed by JetBrains.
